@@ -4,9 +4,29 @@ import pandas as pd
 import pickle
 import gc
 import numpy as np
+import json
 
 EXPERIMENT_DIR = os.path.join('./experiments')
 CACHE_DIR = os.path.join('./cache')
+
+def save_result(config, test, test_preds):
+    auc = config['auc']
+    model = config['model']
+
+    exp_id = experiment_id()
+    output_base = f"{exp_id}-{model}-{auc:.6f}"
+
+    csv = os.path.join(EXPERIMENT_DIR, output_base + ".csv")
+    config_json = os.path.join(EXPERIMENT_DIR, output_base + ".json")
+
+    test['TARGET'] = test_preds
+    test[['SK_ID_CURR', 'TARGET']].to_csv(csv, index=False, float_format='%.8f')
+    print(f'Save to {csv}')
+
+    with open(config_json, 'w') as fp:
+        json.dump(config, fp, indent=2)
+
+
 
 def experiment_id():
     files = [f for f in os.listdir(EXPERIMENT_DIR)]
