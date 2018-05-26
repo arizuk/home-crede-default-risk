@@ -17,7 +17,7 @@ def save_result(config, test, test_preds):
     output_base = f"{exp_id}-{model}-{auc:.6f}"
 
     csv = os.path.join(EXPERIMENT_DIR, output_base + ".csv")
-    config_json = os.path.join(EXPERIMENT_DIR, output_base + ".json")
+    config_json = os.path.join(EXPERIMENT_DIR, f"{exp_id}.json")
 
     test['TARGET'] = test_preds
     test[['SK_ID_CURR', 'TARGET']].to_csv(csv, index=False, float_format='%.8f')
