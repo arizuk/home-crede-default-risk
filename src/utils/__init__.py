@@ -9,7 +9,7 @@ import json
 EXPERIMENT_DIR = os.path.join('./experiments')
 CACHE_DIR = os.path.join('./cache')
 
-def save_result(config, test, test_preds):
+def save_result(config, test, test_preds, clf, features):
     auc = config['auc']
     model = config['model']
 
@@ -18,6 +18,7 @@ def save_result(config, test, test_preds):
 
     csv = os.path.join(EXPERIMENT_DIR, output_base + ".csv")
     config_json = os.path.join(EXPERIMENT_DIR, f"{exp_id}.json")
+    feature_csv = os.path.join(EXPERIMENT_DIR, f"{exp_id}-features.csv")
 
     test['TARGET'] = test_preds
     test[['SK_ID_CURR', 'TARGET']].to_csv(csv, index=False, float_format='%.8f')
@@ -26,6 +27,10 @@ def save_result(config, test, test_preds):
     with open(config_json, 'w') as fp:
         json.dump(config, fp, indent=2)
 
+    importance_df = pd.DataFrame({ 'features': features })
+    importance_df['importance'] = [clf.feature_importances_[features.index(f)] for f in features]
+    importance_df = importance_df.sort_values(by=['importance'], ascending=False)
+    importance_df.to_csv(feature_csv, index=False)
 
 
 def experiment_id():
