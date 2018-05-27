@@ -38,8 +38,4 @@ def app_features(df):
         del df[c]
 
 def prev_features(df):
-    df['AMT_LOAN_PERIOD'] = df['AMT_CREDIT'] / df['AMT_ANNUITY']
-    df['AMT_GOODS_RATIO'] = df['AMT_GOODS_PRICE'] / df['AMT_CREDIT']
-    df['C_HOUR_APPR_PROCESS_START'] = df.HOUR_APPR_PROCESS_START.apply(
-        simplify_hour_appr_process_start)
-    del df['HOUR_APPR_PROCESS_START']
+    df['AMT_APPLICATION_DIFF'] = df['AMT_APPLICATION'] - df['AMT_CREDIT']
