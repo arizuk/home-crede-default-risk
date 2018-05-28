@@ -29,7 +29,8 @@ def app_features(df):
     # df['AMT_GOODS_DIFF'] = df['AMT_CREDIT'] - df['AMT_GOODS_PRICE']
     # df['AMT_CREDIT_INCOME_RATIO'] = df['AMT_CREDIT'] / df['AMT_INCOME_TOTAL']
     # df['AMT_ANNUITY_INCOME_RATIO'] = df['AMT_ANNUITY'] / df['AMT_INCOME_TOTAL']
-    df['X_HOUR_APPR_PROCESS_START'] = df.HOUR_APPR_PROCESS_START.apply(simplify_hour_appr_process_start)
+    df['X_HOUR_APPR_PROCESS_START'] = df.HOUR_APPR_PROCESS_START.astype('category')
+    # df['X_HOUR_APPR_PROCESS_START'] = df.HOUR_APPR_PROCESS_START.apply(simplify_hour_appr_process_start)
     del df['HOUR_APPR_PROCESS_START']
 
     for i in range(2, 22):
