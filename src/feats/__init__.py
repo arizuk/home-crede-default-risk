@@ -33,6 +33,9 @@ def app_features(df):
     # df['X_HOUR_APPR_PROCESS_START'] = df.HOUR_APPR_PROCESS_START.apply(simplify_hour_appr_process_start)
     del df['HOUR_APPR_PROCESS_START']
 
+    df['X_OCCUPATION_TYPE'] = df.OCCUPATION_TYPE.astype('category')
+    del df['OCCUPATION_TYPE']
+
     for i in range(2, 22):
         c = f'FLAG_DOCUMENT_{i}'
         del df[c]

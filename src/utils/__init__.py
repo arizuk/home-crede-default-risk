@@ -27,10 +27,11 @@ def save_result(config, test, test_preds, clf, features):
     with open(config_json, 'w') as fp:
         json.dump(config, fp, indent=2)
 
-    importance_df = pd.DataFrame({ 'features': features })
-    importance_df['importance'] = [clf.feature_importances_[features.index(f)] for f in features]
-    importance_df = importance_df.sort_values(by=['importance'], ascending=False)
-    importance_df.to_csv(feature_csv, index=False)
+    if clf:
+        importance_df = pd.DataFrame({ 'features': features })
+        importance_df['importance'] = [clf.feature_importances_[features.index(f)] for f in features]
+        importance_df = importance_df.sort_values(by=['importance'], ascending=False)
+        importance_df.to_csv(feature_csv, index=False)
 
 
 def experiment_id():
