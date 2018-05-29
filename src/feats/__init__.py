@@ -2,15 +2,6 @@ import pandas as pd
 import numpy as np
 
 
-def simplify_hour_appr_process_start(v):
-    if v >= 22 or v == 0:
-        return 1
-    elif v >= 1 and v <= 9:
-        return 2
-    else:
-        return 3
-
-
 def sum_document_flags(df):
     cnt = np.zeros(df.shape[0])
     for i in range(2, 22):
@@ -22,6 +13,12 @@ def age_category(df):
     age = (df.DAYS_BIRTH * -1)/365
     ageC = pd.cut(age, list(range(0, 101, 5)), right=False)
     return ageC
+
+def organization_type_categ(df):
+    types = ['Business Entity Type 3' 'XNA' 'Self-employed' 'Other' 'Medicine'
+    'Business Entity Type 2' 'Government' 'School' 'Trade: type 7'
+    'Kindergarten' 'Construction']
+    return df.ORGANIZATION_TYPE.apply(lambda x: x if x in types else 'other').astype('category')
 
 def app_features(df):
     df['X_AMT_LOAN_PERIOD'] = df['AMT_CREDIT'] / df['AMT_ANNUITY']

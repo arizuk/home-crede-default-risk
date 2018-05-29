@@ -27,7 +27,7 @@ def distplot(data, x):
     plt.show()
 
 def sort_values(values):
-    if type(values) == pd.core.categorical.Categorical:
+    if type(values) == pd.core.arrays.categorical.Categorical:
         return values.sort_values()
     else:
         return np.sort(values)
@@ -54,6 +54,15 @@ def percentage_plot2(data, x, order_by='value_count'):
     plt.tick_params(axis='both', which='major', labelsize=10)
     plt.show()
 
+def percentage_plot3(data, x):
+    df1 = percentage(data, x)
+    df1.columns = [x, 'Percent']
+    df2 = target_percentage(data, x)
+    df2.columns = [x, 'TargetPercent']
+    df1 = df1.merge(right=df2, on=x).sort_values(by='Percent', ascending=False)
+    df1.set_index(x).plot.bar(figsize=(20, 8))
+    plt.show()
+
 def percentage(data, x):
     df = data[x].value_counts(normalize=True)
     df = df.reset_index()
@@ -64,7 +73,7 @@ def target_percentage(data, x):
     hue = 'TARGET'
     df = data[[x, hue]].groupby([x], as_index=False).mean()
     df = pd.DataFrame({
-        'percent': df[hue],
         x: df[x],
+        'percent': df[hue],
     })
-    return df.sort_values(by=['percent'], ascending=False)
+    return df.sort_values(by=['percent'], ascending=False).reset_index(drop=True)
