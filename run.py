@@ -135,8 +135,17 @@ def lgbm_train(train, y, test, features):
 
 def load_prev():
     prev = utils.read_csv('./input/previous_application.csv')
-    # previous application
-    prev_refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
+
+    prev_cnt = (
+        prev[['SK_ID_CURR', 'SK_ID_PREV', 'NAME_CONTRACT_STATUS']]
+        .groupby(['SK_ID_CURR', 'NAME_CONTRACT_STATUS'])
+        .count()
+        .unstack()
+        .fillna(0)
+        )
+    prev_cnt.columns = prev_cnt.columns.get_level_values(1)
+
+    # prev_refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
     prev = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved']
 
     prev['X_HOUR_APPR_PROCESS_START'] = prev['HOUR_APPR_PROCESS_START'].astype(str)
@@ -154,16 +163,10 @@ def load_prev():
     gc.collect()
 
     avg_prev = prev.groupby('SK_ID_CURR').mean()
-    cnt_prev = prev[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
-    avg_prev['X_NB_APP'] = cnt_prev['SK_ID_PREV']
     del avg_prev['SK_ID_PREV']
 
-    cnt_prev_refused = prev_refused[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
-    cnt_prev_refused['X_REFUSED_CNT'] = cnt_prev_refused['SK_ID_PREV']
-    del cnt_prev_refused['SK_ID_PREV']
     feats.prev_features(avg_prev)
-
-    return (avg_prev, cnt_prev_refused)
+    return (avg_prev, prev_cnt)
 
 def load_buro():
     buro = utils.read_csv('./input/bureau.csv')
@@ -243,13 +246,14 @@ def load_data(debug=False):
     gc.enable()
 
     train, test, y = load_train_test()
-    prev, prev_refused = load_prev()
+    prev, prev_cnt = load_prev()
     buro = load_buro()
     pos = load_pos()
     cc_bal = load_cc_bal()
     inst = load_inst()
 
     prev.columns = ['prev_{}'.format(c) for c in prev.columns]
+    prev_cnt.columns = ['prev_{}'.format(c) for c in prev_cnt.columns]
     buro.columns = ['buro_{}'.format(c) for c in buro.columns]
     inst.columns = ['inst_{}'.format(c) for c in inst.columns]
     pos.columns = ['pos_{}'.format(c) for c in pos.columns]
@@ -260,17 +264,18 @@ def load_data(debug=False):
     train = train.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
     train = train.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
     train = train.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
-    train = train.merge(right=prev_refused.reset_index(), how='left', on='SK_ID_CURR')
+    train = train.merge(right=prev_cnt.reset_index(), how='left', on='SK_ID_CURR')
 
     test = test.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=prev_refused.reset_index(), how='left', on='SK_ID_CURR')
+    test = test.merge(right=prev_cnt.reset_index(), how='left', on='SK_ID_CURR')
 
-    train['X_REFUSED_CNT'] = train['X_REFUSED_CNT'].fillna(0)
-    test['X_REFUSED_CNT'] = test['X_REFUSED_CNT'].fillna(0)
+    for c_ in prev_cnt.columns:
+        train[c_] = train[c_].fillna(0)
+        test[c_] = test[c_].fillna(0)
 
     if debug:
         return locals()
