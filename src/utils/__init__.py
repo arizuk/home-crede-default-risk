@@ -83,18 +83,15 @@ def reduce_mem_usage(df):
 
     return df
 
-def read_csv(file, reduce_mem=True):
+def read_csv(file):
     cache_file = os.path.join(CACHE_DIR, file + ".pkl")
     if os.path.exists(cache_file):
-        df = pickle.load(open(cache_file, 'rb'))
-    else:
-        dir = os.path.dirname(cache_file)
-        os.makedirs(dir, exist_ok=True)
-        df = pd.read_csv(file)
-        df.to_pickle(cache_file)
-        gc.collect()
+        return pickle.load(open(cache_file, 'rb'))
 
-    if reduce_mem:
-        return reduce_mem_usage(df)
-    else:
-        return df
+    cache_dir = os.path.dirname(cache_file)
+    os.makedirs(cache_dir, exist_ok=True)
+    df = pd.read_csv(file)
+    reduce_mem_usage(df)
+    df.to_pickle(cache_file)
+    gc.collect()
+    return df
