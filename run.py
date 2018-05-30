@@ -147,6 +147,7 @@ def load_prev():
 
     # prev_refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
     prev = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved']
+    del prev['NAME_CONTRACT_STATUS']
 
     prev['X_HOUR_APPR_PROCESS_START'] = prev['HOUR_APPR_PROCESS_START'].astype(str)
     del prev['HOUR_APPR_PROCESS_START']
