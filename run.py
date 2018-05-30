@@ -80,7 +80,7 @@ def lgbm_train(train, y, test, features):
     random_states = [1, 42]
 
     params = {
-        'n_estimators': 10,
+        'n_estimators': 4000,
         'learning_rate': 0.01,
         'num_leaves': 63,
         'colsample_bytree': .8,
@@ -133,26 +133,8 @@ def lgbm_train(train, y, test, features):
         'test_preds': test_preds,
     }
 
-if __name__ == '__main__':
-    train = utils.read_csv('./input/application_train.csv')
-    test = utils.read_csv('./input/application_test.csv')
+def load_prev():
     prev = utils.read_csv('./input/previous_application.csv')
-    buro = utils.read_csv('./input/bureau.csv')
-    y = train['TARGET']
-    del train['TARGET']
-
-    feats.app_features(train)
-    feats.app_features(test)
-
-    categorical_feats = [
-        f for f in train.columns if train[f].dtype == 'object'
-    ]
-    for f in categorical_feats:
-        train[f], indexer = pd.factorize(train[f])
-        test[f] = indexer.get_indexer(test[f])
-
-    gc.enable()
-
     # previous application
     prev_refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
     prev = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved']
@@ -181,7 +163,10 @@ if __name__ == '__main__':
     del cnt_prev_refused['SK_ID_PREV']
     feats.prev_features(avg_prev)
 
-    # buro
+    return (avg_prev, cnt_prev_refused)
+
+def load_buro():
+    buro = utils.read_csv('./input/bureau.csv')
     buro_cat_features = [
         f_ for f_ in buro.columns if buro[f_].dtype == 'object'
     ]
@@ -197,7 +182,9 @@ if __name__ == '__main__':
     avg_buro['X_BURO_COUNT'] = buro[['SK_ID_BUREAU','SK_ID_CURR']].groupby('SK_ID_CURR').count()['SK_ID_BUREAU']
     del avg_buro['SK_ID_BUREAU']
 
-    # pos
+    return avg_buro
+
+def load_pos():
     pos = utils.read_csv('./input/POS_CASH_balance.csv')
     pos = pd.concat([pos, pd.get_dummies(pos['NAME_CONTRACT_STATUS'])], axis=1)
     nb_prevs = pos[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
@@ -207,7 +194,9 @@ if __name__ == '__main__':
     del pos, nb_prevs
     gc.collect()
 
-    # credit-card-blance
+    return avg_pos
+
+def load_cc_bal():
     cc_bal = utils.read_csv('./input/credit_card_balance.csv')
     cc_bal = pd.concat([cc_bal, pd.get_dummies(cc_bal['NAME_CONTRACT_STATUS'])], axis=1)
 
@@ -219,6 +208,9 @@ if __name__ == '__main__':
     del cc_bal, nb_prevs
     gc.collect()
 
+    return avg_cc_bal
+
+def load_inst():
     inst = utils.read_csv('./input/installments_payments.csv')
     nb_prevs = inst[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
     inst['SK_ID_PREV'] = inst['SK_ID_CURR'].map(nb_prevs['SK_ID_PREV'])
@@ -227,36 +219,72 @@ if __name__ == '__main__':
     del inst
     gc.collect()
 
+    return avg_inst
 
-    avg_prev.columns = ['prev_{}'.format(c) for c in avg_prev.columns]
-    avg_buro.columns = ['buro_{}'.format(c) for c in avg_buro.columns]
-    avg_inst.columns = ['inst_{}'.format(c) for c in avg_inst.columns]
-    avg_pos.columns = ['pos_{}'.format(c) for c in avg_pos.columns]
-    avg_cc_bal.columns = ['cc_bal_{}'.format(c) for c in avg_cc_bal.columns]
+def load_train_test():
+    train = utils.read_csv('./input/application_train.csv')
+    test = utils.read_csv('./input/application_test.csv')
+    y = train['TARGET']
+    del train['TARGET']
 
-    train = train.merge(right=avg_prev.reset_index(), how='left', on='SK_ID_CURR')
-    train = train.merge(right=avg_buro.reset_index(), how='left', on='SK_ID_CURR')
-    train = train.merge(right=avg_inst.reset_index(), how='left', on='SK_ID_CURR')
-    train = train.merge(right=avg_pos.reset_index(), how='left', on='SK_ID_CURR')
-    train = train.merge(right=avg_cc_bal.reset_index(), how='left', on='SK_ID_CURR')
-    train = train.merge(right=cnt_prev_refused.reset_index(), how='left', on='SK_ID_CURR')
+    feats.app_features(train)
+    feats.app_features(test)
 
-    test = test.merge(right=avg_prev.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=avg_buro.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=avg_inst.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=avg_pos.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=avg_cc_bal.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=cnt_prev_refused.reset_index(), how='left', on='SK_ID_CURR')
+    categorical_feats = [
+        f for f in train.columns if train[f].dtype == 'object'
+    ]
+    for f in categorical_feats:
+        train[f], indexer = pd.factorize(train[f])
+        test[f] = indexer.get_indexer(test[f])
+
+    return (train, test, y)
+
+def load_data(debug=False):
+    gc.enable()
+
+    train, test, y = load_train_test()
+    prev, prev_refused = load_prev()
+    buro = load_buro()
+    pos = load_pos()
+    cc_bal = load_cc_bal()
+    inst = load_inst()
+
+    prev.columns = ['prev_{}'.format(c) for c in prev.columns]
+    buro.columns = ['buro_{}'.format(c) for c in buro.columns]
+    inst.columns = ['inst_{}'.format(c) for c in inst.columns]
+    pos.columns = ['pos_{}'.format(c) for c in pos.columns]
+    cc_bal.columns = ['cc_bal_{}'.format(c) for c in cc_bal.columns]
+
+    train = train.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
+    train = train.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
+    train = train.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
+    train = train.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
+    train = train.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
+    train = train.merge(right=prev_refused.reset_index(), how='left', on='SK_ID_CURR')
+
+    test = test.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
+    test = test.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
+    test = test.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
+    test = test.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
+    test = test.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
+    test = test.merge(right=prev_refused.reset_index(), how='left', on='SK_ID_CURR')
 
     train['X_REFUSED_CNT'] = train['X_REFUSED_CNT'].fillna(0)
     test['X_REFUSED_CNT'] = test['X_REFUSED_CNT'].fillna(0)
+
+    if debug:
+        return locals()
+    return (train, test, y)
+
+if __name__ == '__main__':
+    train, test, y = load_data()
 
     # Features
     excluded_feats = ['SK_ID_CURR']
     excluded_feats = sum(list(map(lambda c: [c, f"{c}_x", f"{c}_y"], excluded_feats)), [])
     features = [f_ for f_ in train.columns if f_ not in excluded_feats]
 
-    # kfold_train(
+    # lgbm_train_kfold(
     #     train=train,
     #     y=y,
     #     test=test,
