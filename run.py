@@ -145,9 +145,12 @@ def load_prev():
         )
     prev_cnt.columns = prev_cnt.columns.get_level_values(1)
 
+    # TODO: CODE_REJECT_REASON
+
     # prev_refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
     prev = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved']
     del prev['NAME_CONTRACT_STATUS']
+    del prev['CODE_REJECT_REASON']
 
     prev['X_HOUR_APPR_PROCESS_START'] = prev['HOUR_APPR_PROCESS_START'].astype(str)
     del prev['HOUR_APPR_PROCESS_START']
@@ -166,8 +169,9 @@ def load_prev():
     avg_prev = prev.groupby('SK_ID_CURR').mean()
     del avg_prev['SK_ID_PREV']
 
-    feats.prev_features(avg_prev)
-    return (avg_prev, prev_cnt)
+    avg_prev = avg_prev.reset_index().merge(right=prev_cnt.reset_index(), how="left", on="SK_ID_CURR")
+    avg_prev = avg_prev.set_index('SK_ID_CURR')
+    return avg_prev
 
 def load_buro():
     buro = utils.read_csv('./input/bureau.csv')
@@ -247,14 +251,13 @@ def load_data(debug=False):
     gc.enable()
 
     train, test, y = load_train_test()
-    prev, prev_cnt = load_prev()
+    prev = load_prev()
     buro = load_buro()
     pos = load_pos()
     cc_bal = load_cc_bal()
     inst = load_inst()
 
     prev.columns = ['prev_{}'.format(c) for c in prev.columns]
-    prev_cnt.columns = ['prev_{}'.format(c) for c in prev_cnt.columns]
     buro.columns = ['buro_{}'.format(c) for c in buro.columns]
     inst.columns = ['inst_{}'.format(c) for c in inst.columns]
     pos.columns = ['pos_{}'.format(c) for c in pos.columns]
@@ -265,14 +268,12 @@ def load_data(debug=False):
     train = train.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
     train = train.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
     train = train.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
-    train = train.merge(right=prev_cnt.reset_index(), how='left', on='SK_ID_CURR')
 
     test = test.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=prev_cnt.reset_index(), how='left', on='SK_ID_CURR')
 
     for c_ in prev_cnt.columns:
         train[c_] = train[c_].fillna(0)
