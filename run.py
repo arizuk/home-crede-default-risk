@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import pickle
 from lightgbm import LGBMClassifier
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
@@ -135,6 +136,7 @@ def lgbm_train(train, y, test, features):
 
 def load_prev():
     prev = utils.read_csv('./input/previous_application.csv')
+    prev = prev[prev['NFLAG_LAST_APPL_IN_DAY'] == 1]
 
     prev_cnt = (
         prev[['SK_ID_CURR', 'SK_ID_PREV', 'NAME_CONTRACT_STATUS']]
@@ -146,8 +148,6 @@ def load_prev():
     prev_cnt.columns = prev_cnt.columns.get_level_values(1)
 
     # TODO: CODE_REJECT_REASON
-
-    # prev_refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
     prev = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved']
     del prev['NAME_CONTRACT_STATUS']
     del prev['CODE_REJECT_REASON']
@@ -169,9 +169,22 @@ def load_prev():
     avg_prev = prev.groupby('SK_ID_CURR').mean()
     del avg_prev['SK_ID_PREV']
 
-    avg_prev = avg_prev.reset_index().merge(right=prev_cnt.reset_index(), how="left", on="SK_ID_CURR")
+    avg_prev = avg_prev.reset_index()
+    avg_prev = avg_prev.merge(right=prev_cnt.reset_index(), how="left", on="SK_ID_CURR")
     avg_prev = avg_prev.set_index('SK_ID_CURR')
+
+    feats.prev_features(avg_prev)
     return avg_prev
+
+def load_last():
+    last = pickle.load(open('./features/last_application.pkl', 'rb'))
+    feats.prev_features(last)
+
+    # TODO: categorical features
+    for f_ in [f for f in last.columns if last[f].dtype == 'object']:
+        last[f_], indexer = pd.factorize(last[f_])
+
+    return last
 
 def load_buro():
     buro = utils.read_csv('./input/bureau.csv')
@@ -202,6 +215,7 @@ def load_pos():
     del pos, nb_prevs
     gc.collect()
 
+    del pos['SK_ID_PREV']
     return avg_pos
 
 def load_cc_bal():
@@ -216,6 +230,7 @@ def load_cc_bal():
     del cc_bal, nb_prevs
     gc.collect()
 
+    del avg_cc_bal['SK_ID_PREV']
     return avg_cc_bal
 
 def load_inst():
@@ -227,6 +242,7 @@ def load_inst():
     del inst
     gc.collect()
 
+    del avg_inst['SK_ID_PREV']
     return avg_inst
 
 def load_train_test():
@@ -247,37 +263,56 @@ def load_train_test():
 
     return (train, test, y)
 
+
 def load_data(debug=False):
     gc.enable()
 
     train, test, y = load_train_test()
+    print('Load train, test done')
+
     prev = load_prev()
+    print('Load prev done')
+
+    # last = load_last()
+    # print('Load last done')
+
     buro = load_buro()
+    print('Load buro done')
+
     pos = load_pos()
+    print('Load pos done')
+
     cc_bal = load_cc_bal()
+    print('Load cc_bal done')
+
     inst = load_inst()
+    print('Load inst done')
 
     prev.columns = ['prev_{}'.format(c) for c in prev.columns]
+    # last.columns = ['last_{}'.format(c) for c in last.columns]
     buro.columns = ['buro_{}'.format(c) for c in buro.columns]
     inst.columns = ['inst_{}'.format(c) for c in inst.columns]
     pos.columns = ['pos_{}'.format(c) for c in pos.columns]
     cc_bal.columns = ['cc_bal_{}'.format(c) for c in cc_bal.columns]
 
     train = train.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
+    # train = train.merge(right=last.reset_index(), how='left', on='SK_ID_CURR')
     train = train.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
     train = train.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
     train = train.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
     train = train.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
 
     test = test.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
+    # test = test.merge(right=last.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
 
-    for c_ in prev_cnt.columns:
-        train[c_] = train[c_].fillna(0)
-        test[c_] = test[c_].fillna(0)
+    # TODO: fillna必要かも
+    # for c_ in prev_cnt.columns:
+    #     train[c_] = train[c_].fillna(0)
+    #     test[c_] = test[c_].fillna(0)
 
     if debug:
         return locals()

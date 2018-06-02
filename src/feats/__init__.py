@@ -48,7 +48,7 @@ def app_features(df):
     for c in columns:
       del df[c]
 
-def prev_features(app_df, prev_df):
+def prev_features(prev_df):
     # AMT APPLICATION
     diff = (prev_df['AMT_APPLICATION'] - prev_df['AMT_CREDIT']) / prev_df['AMT_CREDIT']
     prev_df['X_AMT_APPLICATION_DIFF_RATIO'] = diff
