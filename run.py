@@ -141,12 +141,16 @@ def load_prev():
     prev = prev[prev['NFLAG_LAST_APPL_IN_DAY'] == 1]
     prev = prev[prev['FLAG_LAST_APPL_PER_CONTRACT'] == 'Y']
 
-    prev_cnt = (
+    cnt_prev = (
         prev[['SK_ID_CURR', 'SK_ID_PREV', 'NAME_CONTRACT_STATUS']]
         .groupby(['SK_ID_CURR', 'NAME_CONTRACT_STATUS'])
         .count().unstack().fillna(0)
          )
-    prev_cnt.columns = prev_cnt.columns.get_level_values(1)
+    cnt_prev.columns = cnt_prev.columns.get_level_values(1)
+    sum_cnt_prev = cnt_prev.sum(axis=1)
+    for c_ in cnt_prev.columns:
+        cnt_prev['X_' + c_ + '_Percent'] = cnt_prev[c_] / sum_cnt_prev
+    cnt_prev.fillna(0)
 
     refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
     prev = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved']
@@ -192,7 +196,7 @@ def load_prev():
 
     # join
     avg_prev = avg_prev.reset_index()
-    avg_prev = avg_prev.merge(right=prev_cnt.reset_index(), how="left", on="SK_ID_CURR")
+    avg_prev = avg_prev.merge(right=cnt_prev.reset_index(), how="left", on="SK_ID_CURR")
     avg_prev = avg_prev.merge(right=refused.reset_index(), how="left", on="SK_ID_CURR")
     avg_prev = avg_prev.set_index('SK_ID_CURR')
 
@@ -216,7 +220,12 @@ def load_buro():
         .count().unstack().fillna(0)
         )
     cnt_buro.columns = cnt_buro.columns.get_level_values(1)
+    sum_cnt_buro = cnt_buro.sum(axis=1)
+    for c_ in cnt_buro.columns:
+        cnt_buro['X_' + c_ + '_Percent'] = cnt_buro[c_] / sum_cnt_buro
+    cnt_buro.fillna(0)
 
+    closed_buro = buro[buro.CREDIT_ACTIVE == 'Closed']
     buro = buro[buro.CREDIT_ACTIVE == 'Active']
     del buro['CREDIT_CURRENCY']
 
@@ -237,10 +246,16 @@ def load_buro():
     avg_columns = [c for c in buro.columns if c not in sum_columns]
     avg_buro = buro[avg_columns].groupby('SK_ID_CURR').mean()
     sum_buro = buro[['SK_ID_CURR'] + sum_columns].groupby('SK_ID_CURR').sum()
+    sum_buro['X_AMT_CREDIT_SUM_DEBT_RATIO'] = sum_buro['AMT_CREDIT_SUM'] / sum_buro['AMT_CREDIT_SUM_DEBT']
+    sum_buro['X_AMT_CREDIT_SUM_OVERDUE_CREDIT_RATIO'] = sum_buro['AMT_CREDIT_SUM_OVERDUE'] / sum_buro['AMT_CREDIT_SUM']
+
+    closed_buro = closed_buro[['SK_ID_CURR', 'AMT_CREDIT_SUM', 'AMT_CREDIT_MAX_OVERDUE']].groupby('SK_ID_CURR').mean()
+    closed_buro.columns = ["Closed_" + c for c in closed_buro.columns]
 
     avg_buro = avg_buro.reset_index()
     avg_buro = avg_buro.merge(right=cnt_buro.reset_index(), how="left", on="SK_ID_CURR")
     avg_buro = avg_buro.merge(right=sum_buro.reset_index(), how="left", on="SK_ID_CURR")
+    avg_buro = avg_buro.merge(right=closed_buro.reset_index(), how="left", on="SK_ID_CURR")
     avg_buro = avg_buro.set_index('SK_ID_CURR')
 
     del cnt_buro, sum_buro, buro
@@ -355,7 +370,7 @@ def load_data(debug=False):
     feats.combined_features(test)
 
     # TODO: fillna必要かも
-    # for c_ in prev_cnt.columns:
+    # for c_ in cnt_prev.columns:
     #     train[c_] = train[c_].fillna(0)
     #     test[c_] = test[c_].fillna(0)
 
