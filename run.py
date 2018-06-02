@@ -144,10 +144,8 @@ def load_prev():
     prev_cnt = (
         prev[['SK_ID_CURR', 'SK_ID_PREV', 'NAME_CONTRACT_STATUS']]
         .groupby(['SK_ID_CURR', 'NAME_CONTRACT_STATUS'])
-        .count()
-        .unstack()
-        .fillna(0)
-        )
+        .count().unstack().fillna(0)
+         )
     prev_cnt.columns = prev_cnt.columns.get_level_values(1)
 
     refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
@@ -211,6 +209,17 @@ def load_last():
 
 def load_buro():
     buro = utils.read_csv('./input/bureau.csv')
+
+    cnt_buro = (
+        buro[['SK_ID_CURR', 'SK_ID_BUREAU', 'CREDIT_ACTIVE']]
+        .groupby(['SK_ID_CURR', 'CREDIT_ACTIVE'])
+        .count().unstack().fillna(0)
+        )
+    cnt_buro.columns = cnt_buro.columns.get_level_values(1)
+
+    buro = buro[buro.CREDIT_ACTIVE == 'Active']
+    del buro['CREDIT_CURRENCY']
+
     buro_dum = pd.DataFrame()
     buro_cat_features = [
         f_ for f_ in buro.columns if buro[f_].dtype == 'object'
@@ -222,11 +231,20 @@ def load_buro():
     # for f_ in buro_cat_features:
     #     buro[f_], _ = pd.factorize(buro[f_])
 
-    buro = buro[buro.CREDIT_ACTIVE == 'Active']
-    avg_buro = buro.groupby('SK_ID_CURR').mean()
-    avg_buro['X_BURO_COUNT'] = buro[['SK_ID_BUREAU','SK_ID_CURR']].groupby('SK_ID_CURR').count()['SK_ID_BUREAU']
-    del avg_buro['SK_ID_BUREAU']
+    sum_columns = [
+        'AMT_CREDIT_SUM', 'AMT_CREDIT_SUM_DEBT', 'AMT_CREDIT_SUM_LIMIT', 'AMT_CREDIT_SUM_OVERDUE',
+    ]
+    avg_columns = [c for c in buro.columns if c not in sum_columns]
+    avg_buro = buro[avg_columns].groupby('SK_ID_CURR').mean()
+    sum_buro = buro[['SK_ID_CURR'] + sum_columns].groupby('SK_ID_CURR').sum()
 
+    avg_buro = avg_buro.reset_index()
+    avg_buro = avg_buro.merge(right=cnt_buro.reset_index(), how="left", on="SK_ID_CURR")
+    avg_buro = avg_buro.merge(right=sum_buro.reset_index(), how="left", on="SK_ID_CURR")
+    avg_buro = avg_buro.set_index('SK_ID_CURR')
+
+    del cnt_buro, sum_buro, buro
+    del avg_buro['SK_ID_BUREAU']
     return avg_buro
 
 def load_pos():
