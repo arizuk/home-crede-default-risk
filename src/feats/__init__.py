@@ -48,8 +48,12 @@ def app_features(df):
     for c in columns:
       del df[c]
 
-def prev_features(prev_df):
+def prev_features(df):
     # AMT APPLICATION
-    diff = (prev_df['AMT_APPLICATION'] - prev_df['AMT_CREDIT']) / prev_df['AMT_CREDIT']
-    prev_df['X_AMT_APPLICATION_DIFF_RATIO'] = diff
-    del prev_df['AMT_APPLICATION']
+    diff = (df['AMT_APPLICATION'] - df['AMT_CREDIT']) / df['AMT_CREDIT']
+    df['X_AMT_APPLICATION_DIFF_RATIO'] = diff
+    del df['AMT_APPLICATION']
+
+def combined_features(df):
+    df['X_APPROVTED_AMT_CREDIT_RATIO'] = df['AMT_CREDIT'] / df['prev_X_MAX_AMT_CREDIT']
+    return True

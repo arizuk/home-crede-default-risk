@@ -5,6 +5,9 @@ import pickle
 import gc
 import numpy as np
 import json
+import contextlib
+from timeit import default_timer as timer
+import humanfriendly
 
 EXPERIMENT_DIR = os.path.join('./experiments')
 CACHE_DIR = os.path.join('./cache')
@@ -95,3 +98,11 @@ def read_csv(file):
     df.to_pickle(cache_file)
     gc.collect()
     return df
+
+
+@contextlib.contextmanager
+def timeit():
+    start = timer()
+    yield
+    end = timer()
+    print('Wall time: {}'.format(humanfriendly.format_timespan(end - start)))

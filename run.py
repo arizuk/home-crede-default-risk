@@ -42,10 +42,11 @@ def lgbm_train_kfold(train, y, test, features):
         val_x, val_y = train[features].iloc[val_idx], y.iloc[val_idx]
 
         clf = LGBMClassifier(**params)
-        clf.fit(trn_x, trn_y,
-                eval_set= [(trn_x, trn_y), (val_x, val_y)],
-                eval_metric='auc', verbose=250, early_stopping_rounds=150
-            )
+        with utils.timeit():
+            clf.fit(trn_x, trn_y,
+                    eval_set= [(trn_x, trn_y), (val_x, val_y)],
+                    eval_metric='auc', verbose=250, early_stopping_rounds=150
+                )
 
         trn_preds[trn_idx] = clf.predict_proba(trn_x, num_iteration=clf.best_iteration_)[:, 1]
         oof_preds[val_idx] = clf.predict_proba(val_x, num_iteration=clf.best_iteration_)[:, 1]
@@ -101,7 +102,8 @@ def lgbm_train(train, y, test, features):
         clf = LGBMClassifier(**params)
 
         eval_set = [(trn_x, trn_y), (val_x, val_y)]
-        clf.fit(trn_x, trn_y, eval_set=eval_set, eval_metric='auc', verbose=250, early_stopping_rounds=150)
+        with utils.timeit():
+            clf.fit(trn_x, trn_y, eval_set=eval_set, eval_metric='auc', verbose=250, early_stopping_rounds=150)
 
         trn_preds = clf.predict_proba(trn_x, num_iteration=clf.best_iteration_)[:, 1]
         val_preds = clf.predict_proba(val_x, num_iteration=clf.best_iteration_)[:, 1]
@@ -137,6 +139,7 @@ def lgbm_train(train, y, test, features):
 def load_prev():
     prev = utils.read_csv('./input/previous_application.csv')
     prev = prev[prev['NFLAG_LAST_APPL_IN_DAY'] == 1]
+    prev = prev[prev['FLAG_LAST_APPL_PER_CONTRACT'] == 'Y']
 
     prev_cnt = (
         prev[['SK_ID_CURR', 'SK_ID_PREV', 'NAME_CONTRACT_STATUS']]
@@ -147,7 +150,7 @@ def load_prev():
         )
     prev_cnt.columns = prev_cnt.columns.get_level_values(1)
 
-    # TODO: CODE_REJECT_REASON
+    refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
     prev = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved']
     del prev['NAME_CONTRACT_STATUS']
     del prev['CODE_REJECT_REASON']
@@ -169,8 +172,30 @@ def load_prev():
     avg_prev = prev.groupby('SK_ID_CURR').mean()
     del avg_prev['SK_ID_PREV']
 
+    # max
+    max_columns = [
+        'AMT_ANNUITY', 'AMT_APPLICATION', 'AMT_CREDIT', 'DAYS_DECISION', 'DAYS_FIRST_DRAWING', 'DAYS_FIRST_DUE',
+        'DAYS_LAST_DUE_1ST_VERSION', 'DAYS_LAST_DUE', 'DAYS_TERMINATION',
+    ]
+    max_prev = prev[['SK_ID_CURR'] + max_columns].groupby('SK_ID_CURR').max()
+    for f_ in max_columns:
+        if f_ in ['AMT_ANNUITY', 'AMT_APPLICATION', 'AMT_CREDIT']:
+            avg_prev['X_MAX_' + f_] = max_prev[f_]
+        else:
+            avg_prev[f_] = max_prev[f_]
+    del max_prev
+
+    # refused
+    refused = refused.sort_values(['DAYS_DECISION'], ascending=False)
+    refused = refused[['SK_ID_CURR', 'CODE_REJECT_REASON', 'AMT_APPLICATION']].groupby('SK_ID_CURR').nth(0)
+    refused['X_REFUSED_AMT_APPLICATION'] = refused['AMT_APPLICATION']
+    del refused['AMT_APPLICATION']
+    refused['CODE_REJECT_REASON'] = refused['CODE_REJECT_REASON'].astype('category')
+
+    # join
     avg_prev = avg_prev.reset_index()
     avg_prev = avg_prev.merge(right=prev_cnt.reset_index(), how="left", on="SK_ID_CURR")
+    avg_prev = avg_prev.merge(right=refused.reset_index(), how="left", on="SK_ID_CURR")
     avg_prev = avg_prev.set_index('SK_ID_CURR')
 
     feats.prev_features(avg_prev)
@@ -179,26 +204,25 @@ def load_prev():
 def load_last():
     last = pickle.load(open('./features/last_application.pkl', 'rb'))
     feats.prev_features(last)
-
-    # TODO: categorical features
     for f_ in [f for f in last.columns if last[f].dtype == 'object']:
         last[f_], indexer = pd.factorize(last[f_])
-
+    del last['SK_ID_PREV']
     return last
 
 def load_buro():
     buro = utils.read_csv('./input/bureau.csv')
+    buro_dum = pd.DataFrame()
     buro_cat_features = [
         f_ for f_ in buro.columns if buro[f_].dtype == 'object'
     ]
-    buro_dum = pd.DataFrame()
     for f_ in buro_cat_features:
         buro_dum = pd.concat([buro_dum, pd.get_dummies(buro[f_], prefix=f_).astype(np.uint8)], axis=1)
 
     buro = pd.concat([buro, buro_dum], axis=1)
-
     # for f_ in buro_cat_features:
     #     buro[f_], _ = pd.factorize(buro[f_])
+
+    buro = buro[buro.CREDIT_ACTIVE == 'Active']
     avg_buro = buro.groupby('SK_ID_CURR').mean()
     avg_buro['X_BURO_COUNT'] = buro[['SK_ID_BUREAU','SK_ID_CURR']].groupby('SK_ID_CURR').count()['SK_ID_BUREAU']
     del avg_buro['SK_ID_BUREAU']
@@ -215,7 +239,7 @@ def load_pos():
     del pos, nb_prevs
     gc.collect()
 
-    del pos['SK_ID_PREV']
+    del avg_pos['SK_ID_PREV']
     return avg_pos
 
 def load_cc_bal():
@@ -308,6 +332,9 @@ def load_data(debug=False):
     test = test.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
+
+    feats.combined_features(train)
+    feats.combined_features(test)
 
     # TODO: fillna必要かも
     # for c_ in prev_cnt.columns:
