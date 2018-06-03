@@ -212,6 +212,29 @@ def load_last():
     del last['SK_ID_PREV']
     return last
 
+def load_buro_balance():
+    buro_bal = utils.read_csv('./input/bureau_balance.csv')
+    buro_bal = buro_bal[buro_bal.STATUS != 'C']
+
+    cnt_buro_bal = (
+        buro_bal.groupby(['SK_ID_BUREAU', 'STATUS'])
+        .count().unstack().fillna(0)
+        )
+    cnt_buro_bal.columns = cnt_buro_bal.columns.get_level_values(1)
+
+    # days past due
+    # dpd_columns = [c for c in cnt_buro_bal.columns if c in ['1', '2', '3', '4']]
+    # cnt_buro_bal['DPD'] = np.zeros(cnt_buro_bal.shape[0])
+    # for c in dpd_columns:
+    #     cnt_buro_bal['DPD'] = cnt_buro_bal['DPD'] + cnt_buro_bal[c]
+    #     del cnt_buro_bal[c]
+
+    sum_cnt_buro = cnt_buro_bal.sum(axis=1)
+    for c_ in cnt_buro_bal.columns:
+        cnt_buro_bal['X_' + c_ + '_Percent'] = cnt_buro_bal[c_] / sum_cnt_buro
+    cnt_buro_bal.fillna(0)
+    return cnt_buro_bal
+
 def load_buro():
     buro = utils.read_csv('./input/bureau.csv')
 
@@ -226,8 +249,6 @@ def load_buro():
         cnt_buro['X_' + c_ + '_Percent'] = cnt_buro[c_] / sum_cnt_buro
     cnt_buro.fillna(0)
 
-    closed_buro = buro[buro.CREDIT_ACTIVE == 'Closed']
-    buro = buro[buro.CREDIT_ACTIVE == 'Active']
     del buro['CREDIT_CURRENCY']
 
     buro_dum = pd.DataFrame()
@@ -241,15 +262,27 @@ def load_buro():
     # for f_ in buro_cat_features:
     #     buro[f_], _ = pd.factorize(buro[f_])
 
+    # join buro_balance
+    buro_bal = load_buro_balance()
+    buro_bal = buro[['SK_ID_CURR', 'SK_ID_BUREAU']].merge(right=buro_bal.reset_index(), how="left", on="SK_ID_BUREAU")
+    avg_buro_bal = buro_bal.groupby('SK_ID_CURR').mean()
+    del avg_buro_bal['SK_ID_BUREAU']
+    del buro_bal
+
+    # active buro sum/avg
+    active_buro = buro[buro.CREDIT_ACTIVE == 'Active']
     sum_columns = [
         'AMT_CREDIT_SUM', 'AMT_CREDIT_SUM_DEBT', 'AMT_CREDIT_SUM_LIMIT', 'AMT_CREDIT_SUM_OVERDUE',
     ]
     avg_columns = [c for c in buro.columns if c not in sum_columns]
-    avg_buro = buro[avg_columns].groupby('SK_ID_CURR').mean()
-    sum_buro = buro[['SK_ID_CURR'] + sum_columns].groupby('SK_ID_CURR').sum()
+    avg_buro = active_buro[avg_columns].groupby('SK_ID_CURR').mean()
+    sum_buro = active_buro[['SK_ID_CURR'] + sum_columns].groupby('SK_ID_CURR').sum()
     sum_buro['X_AMT_CREDIT_SUM_DEBT_RATIO'] = sum_buro['AMT_CREDIT_SUM'] / sum_buro['AMT_CREDIT_SUM_DEBT']
     sum_buro['X_AMT_CREDIT_SUM_OVERDUE_CREDIT_RATIO'] = sum_buro['AMT_CREDIT_SUM_OVERDUE'] / sum_buro['AMT_CREDIT_SUM']
+    del active_buro
 
+    # closed buro
+    closed_buro = buro[buro.CREDIT_ACTIVE == 'Closed']
     closed_buro = closed_buro[['SK_ID_CURR', 'AMT_CREDIT_SUM', 'AMT_CREDIT_MAX_OVERDUE']].groupby('SK_ID_CURR').mean()
     closed_buro.columns = ["Closed_" + c for c in closed_buro.columns]
 
@@ -257,9 +290,10 @@ def load_buro():
     avg_buro = avg_buro.merge(right=cnt_buro.reset_index(), how="left", on="SK_ID_CURR")
     avg_buro = avg_buro.merge(right=sum_buro.reset_index(), how="left", on="SK_ID_CURR")
     avg_buro = avg_buro.merge(right=closed_buro.reset_index(), how="left", on="SK_ID_CURR")
+    avg_buro = avg_buro.merge(right=avg_buro_bal.reset_index(), how="left", on="SK_ID_CURR")
     avg_buro = avg_buro.set_index('SK_ID_CURR')
 
-    del cnt_buro, sum_buro, buro
+    del cnt_buro, sum_buro, buro, closed_buro
     del avg_buro['SK_ID_BUREAU']
     return avg_buro
 
