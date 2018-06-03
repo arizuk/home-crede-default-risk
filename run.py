@@ -1,15 +1,16 @@
+import argparse
 import gc
 import json
 import os
+import pickle
 import re
 
-from lightgbm.plotting import plot_importance
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-import pickle
 from lightgbm import LGBMClassifier
+from lightgbm.plotting import plot_importance
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 
@@ -379,6 +380,11 @@ def load_data(debug=False):
     return (train, test, y)
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--kfold', action='store_true')
+    args = parser.parse_args()
+
+    # Load data
     train, test, y = load_data()
 
     # Features
@@ -386,19 +392,21 @@ if __name__ == '__main__':
     excluded_feats = sum(list(map(lambda c: [c, f"{c}_x", f"{c}_y"], excluded_feats)), [])
     features = [f_ for f_ in train.columns if f_ not in excluded_feats]
 
-    # lgbm_train_kfold(
-    #     train=train,
-    #     y=y,
-    #     test=test,
-    #     features=features,
-    # )
+    if args.kfold:
+        results = lgbm_train_kfold(
+            train=train,
+            y=y,
+            test=test,
+            features=features,
+        )
+    else:
+        results = lgbm_train(
+            train=train,
+            y=y,
+            test=test,
+            features=features,
+        )
 
-    results = lgbm_train(
-        train=train,
-        y=y,
-        test=test,
-        features=features,
-    )
     for var_ in ['config', 'test_preds', 'clf']:
         locals()[var_] = results[var_]
 
