@@ -415,7 +415,8 @@ if __name__ == '__main__':
         test_preds=test_preds,
         config=config,
         features=features,
-        clf=clf
+        clf=clf,
+        kfold=args.kfold
     )
 
     reg = re.compile(r"(.*_)?X_")

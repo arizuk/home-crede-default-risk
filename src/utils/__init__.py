@@ -12,12 +12,12 @@ import humanfriendly
 EXPERIMENT_DIR = os.path.join('./experiments')
 CACHE_DIR = os.path.join('./cache')
 
-def save_result(config, test, test_preds, clf, features):
+def save_result(config, test, test_preds, clf, features, kfold):
     auc = config['auc']
     model = config['model']
 
     exp_id = experiment_id()
-    output_base = f"{exp_id}-{model}-{auc:.6f}"
+    output_base = f"{exp_id}-{model}-{'kfold' if kfold else 'avg'}-{auc:.6f}"
 
     csv = os.path.join(EXPERIMENT_DIR, output_base + ".csv")
     config_json = os.path.join(EXPERIMENT_DIR, f"{exp_id}.json")
