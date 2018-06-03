@@ -204,6 +204,40 @@ def load_prev():
     feats.prev_features(avg_prev)
     return avg_prev
 
+
+def load_inst():
+    inst = utils.read_csv('./input/installments_payments.csv')
+
+    inst['X_DPD'] = inst['DAYS_ENTRY_PAYMENT'] - inst['DAYS_INSTALMENT']
+    inst['X_OVERDUE'] = inst['DAYS_INSTALMENT'] < inst['DAYS_ENTRY_PAYMENT']
+    inst['X_OVER_PAYMENT_RATIO'] = (inst['AMT_PAYMENT'] - inst['AMT_INSTALMENT']) / inst['AMT_PAYMENT']
+
+    # NUM_INSTALMENT_VERSION
+    inst_version = inst[['SK_ID_CURR', 'SK_ID_PREV', 'NUM_INSTALMENT_VERSION']].groupby(['SK_ID_CURR', 'SK_ID_PREV']).max()
+    inst_version = inst_version.reset_index().groupby('SK_ID_CURR').mean()
+    inst['X_NUM_INSTALMENT_VERSION'] = inst['SK_ID_CURR'].map(inst_version['NUM_INSTALMENT_VERSION'])
+    del inst['NUM_INSTALMENT_VERSION']
+    del inst_version
+
+    # 支払い回数
+    nb_prevs = inst[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
+    inst['X_CNT_INSTALLMENT'] = inst['SK_ID_CURR'].map(nb_prevs['SK_ID_PREV'])
+
+    # 遅延回数
+    nb_overdues = inst[inst['X_OVERDUE']][['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
+    inst['X_CNT_OVERDUE'] = inst['SK_ID_CURR'].map(nb_overdues['SK_ID_PREV'])
+    inst['X_CNT_OVERDUE'] = inst['X_CNT_OVERDUE'].fillna(0)
+    inst['X_OVERDUE_RATE'] = inst['X_CNT_OVERDUE'] / inst['X_CNT_INSTALLMENT']
+
+    avg_inst = inst.groupby('SK_ID_CURR').mean()
+    del inst
+    gc.collect()
+
+    for c in ['SK_ID_PREV', 'NUM_INSTALMENT_NUMBER', 'DAYS_INSTALMENT', 'DAYS_ENTRY_PAYMENT', 'X_OVERDUE']:
+        del avg_inst[c]
+
+    return avg_inst
+
 def load_last():
     last = pickle.load(open('./features/last_application.pkl', 'rb'))
     feats.prev_features(last)
@@ -324,18 +358,6 @@ def load_cc_bal():
 
     del avg_cc_bal['SK_ID_PREV']
     return avg_cc_bal
-
-def load_inst():
-    inst = utils.read_csv('./input/installments_payments.csv')
-    nb_prevs = inst[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
-    inst['SK_ID_PREV'] = inst['SK_ID_CURR'].map(nb_prevs['SK_ID_PREV'])
-
-    avg_inst = inst.groupby('SK_ID_CURR').mean()
-    del inst
-    gc.collect()
-
-    del avg_inst['SK_ID_PREV']
-    return avg_inst
 
 def load_train_test():
     train = utils.read_csv('./input/application_train.csv')
