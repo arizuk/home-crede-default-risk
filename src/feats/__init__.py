@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 
-
 def sum_document_flags(df):
     cnt = np.zeros(df.shape[0])
     for i in range(2, 22):

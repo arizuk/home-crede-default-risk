@@ -8,6 +8,7 @@ import json
 import contextlib
 from timeit import default_timer as timer
 import humanfriendly
+import functools
 
 EXPERIMENT_DIR = os.path.join('./experiments')
 CACHE_DIR = os.path.join('./cache')
@@ -106,3 +107,14 @@ def timeit():
     yield
     end = timer()
     print('Wall time: {}'.format(humanfriendly.format_timespan(end - start)))
+
+def logit(func):
+    @functools.wraps(func)
+    def wrapper(*args,**kwargs):
+        start = timer()
+        result = func(*args,**kwargs)
+        end = timer()
+        elapsed = humanfriendly.format_timespan(end - start)
+        print('{} done. {}'.format(func.__name__, elapsed))
+        return result
+    return wrapper
