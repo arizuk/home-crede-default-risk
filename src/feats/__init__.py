@@ -25,11 +25,21 @@ def app_features(df):
     # df['AMT_GOODS_DIFF'] = df['AMT_CREDIT'] - df['AMT_GOODS_PRICE']
     # df['AMT_CREDIT_INCOME_RATIO'] = df['AMT_CREDIT'] / df['AMT_INCOME_TOTAL']
     # df['AMT_ANNUITY_INCOME_RATIO'] = df['AMT_ANNUITY'] / df['AMT_INCOME_TOTAL']
+
+    # NaN values for DAYS_EMPLOYED: 365.243 -> nan
+    df['DAYS_EMPLOYED'].replace(365243, np.nan, inplace= True)
+
+    # Social features
+    df['X_WORKING_LIFE_RATIO'] = df['DAYS_EMPLOYED'] / df['DAYS_BIRTH']
+    df['X_INCOME_PER_FAM'] = df['AMT_INCOME_TOTAL'] / df['CNT_FAM_MEMBERS']
+
     df['X_HOUR_APPR_PROCESS_START'] = df.HOUR_APPR_PROCESS_START.astype('category')
     del df['HOUR_APPR_PROCESS_START']
 
     df['X_OCCUPATION_TYPE'] = df.OCCUPATION_TYPE.astype('category')
     del df['OCCUPATION_TYPE']
+
+
 
     for i in range(2, 22):
         c = f'FLAG_DOCUMENT_{i}'

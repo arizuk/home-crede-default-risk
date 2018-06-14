@@ -2,6 +2,7 @@ import gc
 import pandas as pd
 import numpy as np
 import functools
+import pickle
 
 from src import utils
 from src import feats
@@ -12,6 +13,13 @@ def load_prev():
     prev = utils.read_csv('./input/previous_application.csv')
     prev = prev[prev['NFLAG_LAST_APPL_IN_DAY'] == 1]
     prev = prev[prev['FLAG_LAST_APPL_PER_CONTRACT'] == 'Y']
+
+    # A lot of the continuous days variables have integers as missing value indicators.
+    prev['DAYS_LAST_DUE'].replace(365243, np.nan, inplace=True)
+    prev['DAYS_TERMINATION'].replace(365243, np.nan, inplace=True)
+    prev['DAYS_FIRST_DRAWING'].replace(365243, np.nan, inplace=True)
+    prev['DAYS_FIRST_DUE'].replace(365243, np.nan, inplace=True)
+    prev['DAYS_LAST_DUE_1ST_VERSION'].replace(365243, np.nan, inplace=True)
 
     cnt_prev = (
         prev[['SK_ID_CURR', 'SK_ID_PREV', 'NAME_CONTRACT_STATUS']]
@@ -261,7 +269,7 @@ def load_data(debug=False):
     prev = load_prev()
     # last = load_last()
     buro = load_buro()
-    pos = load_pos()
+    # pos = load_pos()
     cc_bal = load_cc_bal()
     inst = load_inst()
 
@@ -269,21 +277,21 @@ def load_data(debug=False):
     # last.columns = ['last_{}'.format(c) for c in last.columns]
     buro.columns = ['buro_{}'.format(c) for c in buro.columns]
     inst.columns = ['inst_{}'.format(c) for c in inst.columns]
-    pos.columns = ['pos_{}'.format(c) for c in pos.columns]
+    # pos.columns = ['pos_{}'.format(c) for c in pos.columns]
     cc_bal.columns = ['cc_bal_{}'.format(c) for c in cc_bal.columns]
 
     train = train.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
     # train = train.merge(right=last.reset_index(), how='left', on='SK_ID_CURR')
     train = train.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
     train = train.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
-    train = train.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
+    # train = train.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
     train = train.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
 
     test = test.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
     # test = test.merge(right=last.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
+    # test = test.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
 
     feats.combined_features(train)
