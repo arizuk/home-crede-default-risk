@@ -39,8 +39,6 @@ def app_features(df):
     df['X_OCCUPATION_TYPE'] = df.OCCUPATION_TYPE.astype('category')
     del df['OCCUPATION_TYPE']
 
-
-
     for i in range(2, 22):
         c = f'FLAG_DOCUMENT_{i}'
         del df[c]

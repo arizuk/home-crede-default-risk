@@ -3,10 +3,31 @@ import pandas as pd
 import numpy as np
 import functools
 import pickle
+from tqdm import tqdm
 
 from src import utils
 from src import feats
 from src.utils import logit
+
+tqdm.pandas()
+
+
+def weighted_average(df, weight_col, by_col):
+    columns = [c for c in df.columns if df[c].dtype != 'object' and c not in [weight_col, by_col]]
+
+    wdf = pd.DataFrame({})
+    wdf[by_col] = df[by_col]
+
+    for c in columns:
+        wdf[c] = df[c] * df[weight_col]
+        wdf[f"{c}_notnull"] = df[weight_col] * pd.notnull(df[c])
+
+    g = wdf.groupby(by_col).sum()
+
+    avg = pd.DataFrame({})
+    for c in columns:
+        avg[c] = g[c] / g[f'{c}_notnull']
+    return avg
 
 @logit
 def load_prev():
@@ -33,6 +54,8 @@ def load_prev():
     cnt_prev.fillna(0)
 
     refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
+
+    # Approved
     prev = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved']
     del prev['NAME_CONTRACT_STATUS']
     del prev['CODE_REJECT_REASON']
@@ -51,6 +74,19 @@ def load_prev():
     del prev_dum
     gc.collect()
 
+    # Weighted average
+    # def weighted_average(data):
+    #     d = {}
+    #     weights = -1 / data['DAYS_DECISION']
+    #     for c in data.columns:
+    #         if data[c].dtype == 'object':
+    #             continue
+    #         d[c] = np.average(data[c], weights=weights)
+    #     return pd.Series(d)
+    # avg_prev = prev.groupby('SK_ID_CURR').progress_apply(weighted_average)
+
+    # prev['weights'] = -1 / prev.DAYS_DECISION
+    # avg_prev = weighted_average(df=prev, weight_col='weights', by_col='SK_ID_CURR')
     avg_prev = prev.groupby('SK_ID_CURR').mean()
     del avg_prev['SK_ID_PREV']
 
@@ -235,7 +271,9 @@ def load_cc_bal():
     nb_prevs = cc_bal[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
     cc_bal['SK_ID_PREV'] = cc_bal['SK_ID_CURR'].map(nb_prevs['SK_ID_PREV'])
 
-    avg_cc_bal = cc_bal.groupby('SK_ID_CURR').mean()
+    cc_bal['weights'] = -1 / cc_bal['MONTHS_BALANCE']
+    avg_cc_bal = weighted_average(cc_bal, 'weights', 'SK_ID_CURR')
+    # avg_cc_bal = cc_bal.groupby('SK_ID_CURR').mean()
 
     del cc_bal, nb_prevs
     gc.collect()
