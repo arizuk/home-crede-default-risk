@@ -55,6 +55,16 @@ def app_features(df):
     for c in columns:
       del df[c]
 
+def app_stat_features(df, test_df):
+    columns = ['OCCUPATION_TYPE', 'AMT_INCOME_TOTAL']
+    df2 = pd.concat([df[columns], test_df[columns]])
+    occ_median = df2.groupby('OCCUPATION_TYPE').median().reset_index()
+    occ_median.rename(columns={ 'AMT_INCOME_TOTAL': 'X_MEDIAN_OCCUPATION_INCOME' }, inplace=True)
+
+    df = df.merge(right=occ_median, how='left', on='OCCUPATION_TYPE')
+    test_df = test_df.merge(right=occ_median, how='left', on='OCCUPATION_TYPE')
+    return (df, test_df)
+
 def prev_features(df):
     # AMT APPLICATION
     diff = (df['AMT_APPLICATION'] - df['AMT_CREDIT']) / df['AMT_CREDIT']

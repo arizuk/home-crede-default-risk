@@ -106,7 +106,7 @@ def timeit():
     start = timer()
     yield
     end = timer()
-    print('Wall time: {}'.format(humanfriendly.format_timespan(end - start)))
+    print('Wall time: {}'.format(humanfriendly.format_timespan(end - start)), flush=True)
 
 def logit(func):
     @functools.wraps(func)
@@ -115,6 +115,6 @@ def logit(func):
         result = func(*args,**kwargs)
         end = timer()
         elapsed = humanfriendly.format_timespan(end - start)
-        print('{} done. {}'.format(func.__name__, elapsed))
+        print('{} done. {}'.format(func.__name__, elapsed), flush=True)
         return result
     return wrapper

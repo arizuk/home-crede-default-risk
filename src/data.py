@@ -288,6 +288,8 @@ def load_train_test():
     y = train['TARGET']
     del train['TARGET']
 
+    train, test = feats.app_stat_features(train, test)
+
     feats.app_features(train)
     feats.app_features(test)
 
