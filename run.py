@@ -36,6 +36,10 @@ def lgbm_default_params():
 
 
 def lgbm_train_kfold(train, y, test, features, random_state=42):
+    categorical_feats = [ f for f in train.columns if train[f].dtype == 'object' ]
+    categ_train = train[categorical_feats]
+    feats.encode_categories(train=train, test=test, y=y, features=categorical_feats)
+
     folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
     trn_preds = np.zeros(train.shape[0])
     oof_preds = np.zeros(train.shape[0])
@@ -44,8 +48,10 @@ def lgbm_train_kfold(train, y, test, features, random_state=42):
     params = lgbm_default_params()
 
     for n_fold, (trn_idx, val_idx) in enumerate(folds.split(train, y)):
+        train[categorical_feats] = categ_train #restore
         trn_x, trn_y = train[features].iloc[trn_idx], y.iloc[trn_idx]
         val_x, val_y = train[features].iloc[val_idx], y.iloc[val_idx]
+        feats.encode_categories(train=trn_x, test=val_x, y=trn_y, features=categorical_feats)
 
         clf = LGBMClassifier(**params)
         with utils.timeit():
@@ -82,6 +88,10 @@ def lgbm_train_kfold(train, y, test, features, random_state=42):
     }
 
 def lgbm_train(train, y, test, features):
+    categorical_feats = [ f for f in train.columns if train[f].dtype == 'object' ]
+    categ_train = train[categorical_feats]
+    feats.encode_categories(train=train, test=test, y=y, features=categorical_feats)
+
     test_preds = np.zeros(test.shape[0])
     trn_aucs = []
     aucs = []
@@ -90,7 +100,9 @@ def lgbm_train(train, y, test, features):
     params = lgbm_default_params()
 
     for i in range(0, 2):
+        train[categorical_feats] = categ_train #restore
         trn_x, val_x, trn_y, val_y = train_test_split(train[features], y,  test_size=0.2, random_state=random_states[i])
+        feats.encode_categories(train=trn_x, test=val_x, y=trn_y, features=categorical_feats)
 
         clf = LGBMClassifier(**params)
 

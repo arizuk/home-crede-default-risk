@@ -1,28 +1,22 @@
 import pandas as pd
 import numpy as np
+from src.utils import logit
 
-def sum_document_flags(df):
-    cnt = np.zeros(df.shape[0])
-    for i in range(2, 22):
-        col = f'FLAG_DOCUMENT_{i}'
-        cnt = df[col] + cnt
-    return cnt
+@logit
+def encode_categories(train, test, y, features):
+    for f in features:
+        mean_target_encoding(train, test, y, f)
+        # train[f], indexer = pd.factorize(train[f])
+        # test[f] = indexer.get_indexer(test[f])
 
-def age_category(df):
-    age = (df.DAYS_BIRTH * -1)/365
-    ageC = pd.cut(age, list(range(0, 101, 5)), right=False)
-    return ageC
+def mean_target_encoding(train, test, y, column):
+    df = pd.DataFrame({})
+    df['TARGET'] = y
+    df[column] = train[column]
 
-def organization_type_categ(df):
-    types = ['Business Entity Type 3' 'XNA' 'Self-employed' 'Other' 'Medicine'
-    'Business Entity Type 2' 'Government' 'School' 'Trade: type 7'
-    'Kindergarten' 'Construction']
-    return df.ORGANIZATION_TYPE.apply(lambda x: x if x in types else 'other').astype('category')
-
-
-def target_encoding(df, test_df, column):
-    df.groupby('TARGET')
-
+    means = df.groupby(column).TARGET.mean()
+    train[column] = train[column].map(means)
+    test[column] = test[column].map(means)
 
 def app_features(df):
     df['X_AMT_LOAN_PERIOD'] = df['AMT_CREDIT'] / df['AMT_ANNUITY']
@@ -41,8 +35,8 @@ def app_features(df):
     df['X_HOUR_APPR_PROCESS_START'] = df.HOUR_APPR_PROCESS_START.astype('category')
     del df['HOUR_APPR_PROCESS_START']
 
-    df['X_OCCUPATION_TYPE'] = df.OCCUPATION_TYPE.astype('category')
-    del df['OCCUPATION_TYPE']
+    # df['X_OCCUPATION_TYPE'] = df.OCCUPATION_TYPE.astype('category')
+    # del df['OCCUPATION_TYPE']
 
     for i in range(2, 22):
         c = f'FLAG_DOCUMENT_{i}'
