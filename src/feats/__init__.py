@@ -19,6 +19,11 @@ def organization_type_categ(df):
     'Kindergarten' 'Construction']
     return df.ORGANIZATION_TYPE.apply(lambda x: x if x in types else 'other').astype('category')
 
+
+def target_encoding(df, test_df, column):
+    df.groupby('TARGET')
+
+
 def app_features(df):
     df['X_AMT_LOAN_PERIOD'] = df['AMT_CREDIT'] / df['AMT_ANNUITY']
     df['X_AMT_GOODS_RATIO'] = df['AMT_GOODS_PRICE'] / df['AMT_CREDIT']

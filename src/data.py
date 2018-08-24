@@ -321,17 +321,21 @@ def load_data(debug=False):
     cc_bal.columns = ['cc_bal_{}'.format(c) for c in cc_bal.columns]
 
     train = train.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
-    # train = train.merge(right=last.reset_index(), how='left', on='SK_ID_CURR')
-    train = train.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
-    train = train.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
-    # train = train.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
-    train = train.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
-
     test = test.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
+
+    # train = train.merge(right=last.reset_index(), how='left', on='SK_ID_CURR')
     # test = test.merge(right=last.reset_index(), how='left', on='SK_ID_CURR')
+
+    train = train.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
+
+    train = train.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
+
+    # train = train.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
     # test = test.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
+
+    train = train.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
     test = test.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
 
     feats.combined_features(train)

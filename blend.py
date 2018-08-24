@@ -2,9 +2,9 @@ import pandas as pd
 
 
 df1 = pd.read_csv('./blends/WEIGHT_AVERAGE_RANK2.csv')
-df2 = pd.read_csv('./blends/084-lgbm-kfold-0.790403.csv')
+df2 = pd.read_csv('./experiments/086-lgbm-avg-0.794661.csv')
 
-ratios = [0.4, 0.6]
+ratios = [0.5]
 for i, ratio in enumerate(ratios):
     print(ratio)
     target = df1['TARGET'] * (1 - ratio) + df2['TARGET'] * ratio

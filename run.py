@@ -18,26 +18,30 @@ from src import feats
 from src import utils
 from src import data
 
-def lgbm_train_kfold(train, y, test, features):
-    folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-    trn_preds = np.zeros(train.shape[0])
-    oof_preds = np.zeros(train.shape[0])
-    test_preds = np.zeros(test.shape[0])
-
-    params = {
+def lgbm_default_params():
+    return {
         'n_estimators': 4000,
         'learning_rate': 0.01,
         'num_leaves': 63,
-        'colsample_bytree': .8,
+        'colsample_bytree': .4,
         'subsample': .8,
         'subsample_freq': 5,
         'max_depth': 5,
         'reg_alpha': .001,
-        'reg_lambda': .1,
+        'reg_lambda': .9,
         'min_split_gain': .01,
         'device': "gpu",
         'verbose': -1,
     }
+
+
+def lgbm_train_kfold(train, y, test, features, random_state=42):
+    folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=random_state)
+    trn_preds = np.zeros(train.shape[0])
+    oof_preds = np.zeros(train.shape[0])
+    test_preds = np.zeros(test.shape[0])
+
+    params = lgbm_default_params()
 
     for n_fold, (trn_idx, val_idx) in enumerate(folds.split(train, y)):
         trn_x, trn_y = train[features].iloc[trn_idx], y.iloc[trn_idx]
@@ -83,20 +87,7 @@ def lgbm_train(train, y, test, features):
     aucs = []
     random_states = [1, 42]
 
-    params = {
-        'n_estimators': 4000,
-        'learning_rate': 0.01,
-        'num_leaves': 63,
-        'colsample_bytree': .8,
-        'subsample': .8,
-        'subsample_freq': 5,
-        'max_depth': 5,
-        'reg_alpha': .001,
-        'reg_lambda': .1,
-        'min_split_gain': .01,
-        'device': "gpu",
-        'verbose': -1,
-    }
+    params = lgbm_default_params()
 
     for i in range(0, 2):
         trn_x, val_x, trn_y, val_y = train_test_split(train[features], y,  test_size=0.2, random_state=random_states[i])
