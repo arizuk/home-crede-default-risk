@@ -85,7 +85,8 @@ def load_prev():
     #     return pd.Series(d)
     # avg_prev = prev.groupby('SK_ID_CURR').progress_apply(weighted_average)
 
-    # prev['weights'] = -1 / prev.DAYS_DECISION
+    # prev['weights'] = -1 / (prev.DAYS_DECISION//30)
+    # prev['weights'] = np.log(1 + 1 / ((-1 * prev.DAYS_DECISION) / 30))
     # avg_prev = weighted_average(df=prev, weight_col='weights', by_col='SK_ID_CURR')
     avg_prev = prev.groupby('SK_ID_CURR').mean()
     del avg_prev['SK_ID_PREV']
@@ -189,9 +190,9 @@ def load_buro_balance():
 @logit
 def load_buro():
     buro = utils.read_csv('./input/bureau.csv')
-    buro.loc[[buro['DAYS_CREDIT_ENDDATE'] < -40000, 'DAYS_CREDIT_ENDDATE'] = np.nan
-    buro.loc[[buro['DAYS_CREDIT_UPDATE'] < -40000, 'DAYS_CREDIT_UPDATE'] = np.nan
-    buro.loc[[buro['DAYS_ENDDATE_FACT'] < -40000, 'DAYS_ENDDATE_FACT'] = np.nan
+    buro.loc[buro['DAYS_CREDIT_ENDDATE'] < -40000, 'DAYS_CREDIT_ENDDATE'] = np.nan
+    buro.loc[buro['DAYS_CREDIT_UPDATE'] < -40000, 'DAYS_CREDIT_UPDATE'] = np.nan
+    buro.loc[buro['DAYS_ENDDATE_FACT'] < -40000, 'DAYS_ENDDATE_FACT'] = np.nan
 
     cnt_buro = (
         buro[['SK_ID_CURR', 'SK_ID_BUREAU', 'CREDIT_ACTIVE']]
@@ -255,23 +256,34 @@ def load_buro():
 @logit
 def load_pos():
     pos = utils.read_csv('./input/POS_CASH_balance.csv')
-    pos = pd.concat([pos, pd.get_dummies(pos['NAME_CONTRACT_STATUS'])], axis=1)
-    nb_prevs = pos[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
-    pos['SK_ID_PREV'] = pos['SK_ID_CURR'].map(nb_prevs['SK_ID_PREV'])
-    avg_pos = pos.groupby('SK_ID_CURR').mean()
 
-    del pos, nb_prevs
+    # Features
+    aggregations = {
+        'MONTHS_BALANCE': ['max', 'mean', 'size'],
+        'SK_DPD': ['max', 'mean'],
+        'SK_DPD_DEF': ['max', 'mean']
+    }
+
+    # TODO:
+    # pos = pd.concat([pos, pd.get_dummies(pos['NAME_CONTRACT_STATUS'])], axis=1)
+    # for cat in cat_cols:
+    #     aggregations[cat] = ['mean']
+
+    pos_agg = pos.groupby('SK_ID_CURR').agg(aggregations)
+    pos_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in pos_agg.columns.tolist()])
+
+    # Count pos cash accounts
+    pos_agg['POS_COUNT'] = pos.groupby('SK_ID_CURR').size()
+    del pos
     gc.collect()
-
-    del avg_pos['SK_ID_PREV']
-    return avg_pos
+    return pos_agg
 
 @logit
 def load_cc_bal():
     cc_bal = utils.read_csv('./input/credit_card_balance.csv')
 
-    cc_bal.loc[[cc_bal['AMT_DRAWINGS_ATM_CURRENT'] < 0, 'AMT_DRAWINGS_ATM_CURRENT'] = np.nan
-    cc_bal.loc[[cc_bal['AMT_DRAWINGS_CURRENT'] < 0, 'AMT_DRAWINGS_CURRENT'] = np.nan
+    cc_bal.loc[cc_bal['AMT_DRAWINGS_ATM_CURRENT'] < 0, 'AMT_DRAWINGS_ATM_CURRENT'] = np.nan
+    cc_bal.loc[cc_bal['AMT_DRAWINGS_CURRENT'] < 0, 'AMT_DRAWINGS_CURRENT'] = np.nan
 
     cc_bal = pd.concat([cc_bal, pd.get_dummies(cc_bal['NAME_CONTRACT_STATUS'])], axis=1)
 
@@ -279,6 +291,7 @@ def load_cc_bal():
     cc_bal['SK_ID_PREV'] = cc_bal['SK_ID_CURR'].map(nb_prevs['SK_ID_PREV'])
 
     cc_bal['weights'] = -1 / cc_bal['MONTHS_BALANCE']
+    # cc_bal['weights'] = np.log(1 + -1 / cc_bal['MONTHS_BALANCE'])
     avg_cc_bal = weighted_average(cc_bal, 'weights', 'SK_ID_CURR')
     # avg_cc_bal = cc_bal.groupby('SK_ID_CURR').mean()
 
@@ -320,7 +333,7 @@ def load_data(debug=False):
     prev = load_prev()
     # last = load_last()
     buro = load_buro()
-    # pos = load_pos()
+    pos = load_pos()
     cc_bal = load_cc_bal()
     inst = load_inst()
 
@@ -328,29 +341,21 @@ def load_data(debug=False):
     # last.columns = ['last_{}'.format(c) for c in last.columns]
     buro.columns = ['buro_{}'.format(c) for c in buro.columns]
     inst.columns = ['inst_{}'.format(c) for c in inst.columns]
-    # pos.columns = ['pos_{}'.format(c) for c in pos.columns]
+    pos.columns = ['pos_{}'.format(c) for c in pos.columns]
     cc_bal.columns = ['cc_bal_{}'.format(c) for c in cc_bal.columns]
 
-    train = train.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
+    def dmerge(df):
+        df = df.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
+        # df = df.merge(right=last.reset_index(), how='left', on='SK_ID_CURR')
+        df = df.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
+        df = df.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
+        df = df.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
+        df = df.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
+        feats.combined_features(df)
+        return df
 
-    # train = train.merge(right=last.reset_index(), how='left', on='SK_ID_CURR')
-    # test = test.merge(right=last.reset_index(), how='left', on='SK_ID_CURR')
-
-    train = train.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
-
-    train = train.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
-
-    # train = train.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
-    # test = test.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
-
-    train = train.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=cc_bal.reset_index(), how='left', on='SK_ID_CURR')
-
-    feats.combined_features(train)
-    feats.combined_features(test)
+    train = dmerge(train)
+    test = dmerge(test)
 
     # TODO: fillna必要かも
     # for c_ in cnt_prev.columns:
