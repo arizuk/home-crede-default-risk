@@ -153,6 +153,8 @@ if __name__ == '__main__':
     excluded_feats = sum(list(map(lambda c: [c, f"{c}_x", f"{c}_y"], excluded_feats)), [])
     features = [f_ for f_ in train.columns if f_ not in excluded_feats]
 
+    print('Using features: {}'.format(len(features)), flush=True)
+
     if args.kfold:
         results = lgbm_train_kfold(
             train=train,

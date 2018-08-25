@@ -286,8 +286,9 @@ def load_train_test():
     train = utils.read_csv('./input/application_train.csv')
     test = utils.read_csv('./input/application_test.csv')
 
-    feats.app_features(train)
-    feats.app_features(test)
+    for df in [train, test]:
+        # feats.combine_categories(df)
+        feats.app_features(df)
 
     # 変数の枠だけ作っておく
     categorical_feats = [
@@ -296,6 +297,7 @@ def load_train_test():
     for f in categorical_feats:
         train["X_{}_COUNT".format(f)] = np.zeros(train.shape[0])
         test["X_{}_COUNT".format(f)] = np.zeros(test.shape[0])
+        # feats.merge_minor_category(train, test, f)
         feats.income_median(train, test, f)
 
     y = train['TARGET']
