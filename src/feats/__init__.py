@@ -66,26 +66,59 @@ def income_median(train, test, column):
 #     train.loc[train[col].map(minor).fillna(False), col] = '-'
 #     test.loc[test[col].map(minor).fillna(False), col] = '-'
 
+def age_income_ratio(train, test):
+    age_bins = sum([[0], list(range(20, 68, 2)), [100]], [])
+
+    train_age = pd.cut((train['DAYS_BIRTH'] / 365).astype('int') * -1, bins=age_bins)
+    test_age = pd.cut((test['DAYS_BIRTH'] / 365).astype('int') * -1, bins=age_bins)
+
+    mean = pd.DataFrame({ 'AGE': train_age, 'AMT_INCOME_TOTAL': train.AMT_INCOME_TOTAL }).groupby('AGE').AMT_INCOME_TOTAL.mean()
+
+    train['AGE_INCOME'] = np.log(train.AMT_INCOME_TOTAL / train_age.map(mean))
+    test['AGE_INCOME'] = np.log(test.AMT_INCOME_TOTAL / test_age.map(mean))
+
 def app_features(df):
+    # cleaning
+    df['CODE_GENDER'].replace('XNA', np.nan, inplace=True)
+    df['DAYS_EMPLOYED'].replace(365243, np.nan, inplace=True)
+    df['DAYS_LAST_PHONE_CHANGE'].replace(0, np.nan, inplace=True)
+    df['NAME_FAMILY_STATUS'].replace('Unknown', np.nan, inplace=True)
+
     df['X_AMT_LOAN_PERIOD'] = df['AMT_CREDIT'] / df['AMT_ANNUITY']
     df['X_AMT_GOODS_RATIO'] = df['AMT_GOODS_PRICE'] / df['AMT_CREDIT']
     # df['AMT_GOODS_DIFF'] = df['AMT_CREDIT'] - df['AMT_GOODS_PRICE']
     # df['AMT_CREDIT_INCOME_RATIO'] = df['AMT_CREDIT'] / df['AMT_INCOME_TOTAL']
     df['X_AMT_ANNUITY_INCOME_RATIO_LOG'] =  np.log((df['AMT_INCOME_TOTAL']/df['AMT_ANNUITY']).fillna(0)+0.001)
 
-    # NaN values for DAYS_EMPLOYED: 365.243 -> nan
-    df['DAYS_EMPLOYED'].replace(365243, np.nan, inplace= True)
-
     # Social features
     df['X_WORKING_LIFE_RATIO'] = df['DAYS_EMPLOYED'] / df['DAYS_BIRTH']
-    df['X_INCOME_PER_FAM'] = df['AMT_INCOME_TOTAL'] / df['CNT_FAM_MEMBERS']
 
     df['X_HOUR_APPR_PROCESS_START'] = df.HOUR_APPR_PROCESS_START.astype('category')
     del df['HOUR_APPR_PROCESS_START']
 
-    df['X_EXT_SOURCES_MEAN'] = df[['EXT_SOURCE_1', 'EXT_SOURCE_2', 'EXT_SOURCE_3']].mean(axis=1)
-    df['X_SCORES_STD'] = df[['EXT_SOURCE_1', 'EXT_SOURCE_2', 'EXT_SOURCE_3']].std(axis=1)
-    df['X_SCORES_STD'] = df['X_SCORES_STD'].fillna(df['X_SCORES_STD'].mean())
+    df['X_CAR_TO_BIRTH_RATIO'] = df['OWN_CAR_AGE'] / df['DAYS_BIRTH']
+    df['X_CAR_TO_EMPLOY_RATIO'] = df['OWN_CAR_AGE'] / df['DAYS_EMPLOYED']
+    df['X_CHILDREN_RATIO'] = df['CNT_CHILDREN'] / df['CNT_FAM_MEMBERS']
+    df['X_CREDIT_TO_ANNUITY_RATIO'] = df['AMT_CREDIT'] / df['AMT_ANNUITY']
+    df['X_CREDIT_TO_INCOME_RATIO'] = df['AMT_CREDIT'] / df['AMT_INCOME_TOTAL']
+    df['X_INCOME_CREDIT_PERCENTAGE'] = df['AMT_INCOME_TOTAL'] / df['AMT_CREDIT']
+    df['X_INCOME_PER_CHILD'] = df['AMT_INCOME_TOTAL'] / (1 + df['CNT_CHILDREN'])
+    df['X_INCOME_PER_PERSON'] = df['AMT_INCOME_TOTAL'] / df['CNT_FAM_MEMBERS']
+    df['X_PHONE_TO_BIRTH_RATIO'] = df['DAYS_LAST_PHONE_CHANGE'] / df['DAYS_BIRTH']
+    df['X_PHONE_TO_EMPLOY_RATIO'] = df['DAYS_LAST_PHONE_CHANGE'] / df['DAYS_EMPLOYED']
+    df['X_EXTERNAL_SOURCES_WEIGHTED'] = df.EXT_SOURCE_1 * 2 + df.EXT_SOURCE_2 * 3 + df.EXT_SOURCE_3 * 4
+    df['X_CNT_NON_CHILD'] = df['CNT_FAM_MEMBERS'] - df['CNT_CHILDREN']
+    df['X_CHILD_TO_NON_CHILD_RATIO'] = df['CNT_CHILDREN'] / df['X_CNT_NON_CHILD']
+    df['X_INCOME_PER_NON_CHILD'] = df['AMT_INCOME_TOTAL'] / df['X_CNT_NON_CHILD']
+    df['X_CREDIT_PER_PERSON'] = df['AMT_CREDIT'] / df['CNT_FAM_MEMBERS']
+    df['X_CREDIT_PER_CHILD'] = df['AMT_CREDIT'] / (1 + df['CNT_CHILDREN'])
+    df['X_CREDIT_PER_NON_CHILD'] = df['AMT_CREDIT'] / df['X_CNT_NON_CHILD']
+    for function_name in ['min', 'max', 'sum', 'mean', 'nanmedian']:
+        df['X_EXTERNAL_SOURCES_{}'.format(function_name)] = eval('np.{}'.format(function_name))(
+            df[['EXT_SOURCE_1', 'EXT_SOURCE_2', 'EXT_SOURCE_3']], axis=1)
+
+    df['X_SHORT_EMPLOYMENT'] = (df['DAYS_EMPLOYED'] < -2000).astype(int)
+    df['X_YOUNG_AGE'] = (df['DAYS_BIRTH'] < -14000).astype(int)
 
     doc_flags = [_f for _f in df.columns if 'FLAG_DOC' in _f]
     for f in doc_flags:

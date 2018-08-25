@@ -189,6 +189,9 @@ def load_buro_balance():
 @logit
 def load_buro():
     buro = utils.read_csv('./input/bureau.csv')
+    buro.loc[[buro['DAYS_CREDIT_ENDDATE'] < -40000, 'DAYS_CREDIT_ENDDATE'] = np.nan
+    buro.loc[[buro['DAYS_CREDIT_UPDATE'] < -40000, 'DAYS_CREDIT_UPDATE'] = np.nan
+    buro.loc[[buro['DAYS_ENDDATE_FACT'] < -40000, 'DAYS_ENDDATE_FACT'] = np.nan
 
     cnt_buro = (
         buro[['SK_ID_CURR', 'SK_ID_BUREAU', 'CREDIT_ACTIVE']]
@@ -266,6 +269,10 @@ def load_pos():
 @logit
 def load_cc_bal():
     cc_bal = utils.read_csv('./input/credit_card_balance.csv')
+
+    cc_bal.loc[[cc_bal['AMT_DRAWINGS_ATM_CURRENT'] < 0, 'AMT_DRAWINGS_ATM_CURRENT'] = np.nan
+    cc_bal.loc[[cc_bal['AMT_DRAWINGS_CURRENT'] < 0, 'AMT_DRAWINGS_CURRENT'] = np.nan
+
     cc_bal = pd.concat([cc_bal, pd.get_dummies(cc_bal['NAME_CONTRACT_STATUS'])], axis=1)
 
     nb_prevs = cc_bal[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
@@ -289,6 +296,7 @@ def load_train_test():
     for df in [train, test]:
         # feats.combine_categories(df)
         feats.app_features(df)
+    # feats.age_income_ratio(train, test)
 
     # 変数の枠だけ作っておく
     categorical_feats = [
