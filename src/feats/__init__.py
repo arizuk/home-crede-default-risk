@@ -6,6 +6,7 @@ from src.utils import logit
 def encode_categories(train, test, y, features):
     for f in features:
         mean_target_encoding(train, test, y, f)
+        count_encoding(train, test, y, f)
         # train[f], indexer = pd.factorize(train[f])
         # test[f] = indexer.get_indexer(test[f])
 
@@ -17,6 +18,30 @@ def mean_target_encoding(train, test, y, column):
     means = df.groupby(column).TARGET.mean()
     train[column] = train[column].map(means)
     test[column] = test[column].map(means)
+
+def count_encoding(train, test, y, column):
+    df = pd.DataFrame({})
+    df['TARGET'] = y
+    df[column] = train[column]
+
+    counts = df.groupby(column).TARGET.count()
+    train["X_{}_COUNT".format(column)] = train[column].map(counts)
+    test["X_{}_COUNT".format(column)] = test[column].map(counts)
+
+def income_median(train, test, column):
+    df = pd.DataFrame({})
+    df['AMT_INCOME_TOTAL'] = train['AMT_INCOME_TOTAL']
+    df[column] = train[column]
+
+    medians = df.groupby(column).AMT_INCOME_TOTAL.median()
+    col_median = "X_{}_INCOME_MEDIAN".format(column)
+    train[col_median] = train[column].map(medians)
+    test[col_median] = test[column].map(medians)
+
+    col_ratio = "X_{}_INCOME_MEDIAN_RATIO".format(column)
+    train[col_ratio] = train[col_median] / train['AMT_INCOME_TOTAL']
+    test[col_ratio] = test[col_median] / test['AMT_INCOME_TOTAL']
+
 
 def app_features(df):
     df['X_AMT_LOAN_PERIOD'] = df['AMT_CREDIT'] / df['AMT_ANNUITY']
@@ -54,15 +79,15 @@ def app_features(df):
     for c in columns:
       del df[c]
 
-def app_stat_features(df, test_df):
-    columns = ['OCCUPATION_TYPE', 'AMT_INCOME_TOTAL']
-    df2 = pd.concat([df[columns], test_df[columns]])
-    occ_median = df2.groupby('OCCUPATION_TYPE').median().reset_index()
-    occ_median.rename(columns={ 'AMT_INCOME_TOTAL': 'X_MEDIAN_OCCUPATION_INCOME' }, inplace=True)
+# def app_stat_features(df, test_df):
+#     columns = ['OCCUPATION_TYPE', 'AMT_INCOME_TOTAL']
+#     df2 = pd.concat([df[columns], test_df[columns]])
+#     occ_median = df2.groupby('OCCUPATION_TYPE').median().reset_index()
+#     occ_median.rename(columns={ 'AMT_INCOME_TOTAL': 'X_MEDIAN_OCCUPATION_INCOME' }, inplace=True)
 
-    df = df.merge(right=occ_median, how='left', on='OCCUPATION_TYPE')
-    test_df = test_df.merge(right=occ_median, how='left', on='OCCUPATION_TYPE')
-    return (df, test_df)
+#     df = df.merge(right=occ_median, how='left', on='OCCUPATION_TYPE')
+#     test_df = test_df.merge(right=occ_median, how='left', on='OCCUPATION_TYPE')
+#     return (df, test_df)
 
 def prev_features(df):
     # AMT APPLICATION

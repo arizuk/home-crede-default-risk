@@ -9,6 +9,7 @@ import contextlib
 from timeit import default_timer as timer
 import humanfriendly
 import functools
+from src.utils import slack
 
 EXPERIMENT_DIR = os.path.join('./experiments')
 CACHE_DIR = os.path.join('./cache')
@@ -27,6 +28,8 @@ def save_result(config, test, test_preds, clf, features, kfold):
     test['TARGET'] = test_preds
     test[['SK_ID_CURR', 'TARGET']].to_csv(csv, index=False, float_format='%.8f')
     print(f'Save to {csv}')
+
+    slack.notify(output_base)
 
     with open(config_json, 'w') as fp:
         json.dump(config, fp, indent=2)

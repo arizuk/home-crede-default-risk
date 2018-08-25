@@ -286,17 +286,18 @@ def load_train_test():
     train = utils.read_csv('./input/application_train.csv')
     test = utils.read_csv('./input/application_test.csv')
 
-    train, test = feats.app_stat_features(train, test)
-
     feats.app_features(train)
     feats.app_features(test)
 
-    # categorical_feats = [
-    #     f for f in train.columns if train[f].dtype == 'object'
-    # ]
-    # for f in categorical_feats:
-    #     train[f], indexer = pd.factorize(train[f])
-    #     test[f] = indexer.get_indexer(test[f])
+    # 変数の枠だけ作っておく
+    categorical_feats = [
+        f for f in train.columns if train[f].dtype == 'object'
+    ]
+    for f in categorical_feats:
+        train["X_{}_COUNT".format(f)] = np.zeros(train.shape[0])
+        test["X_{}_COUNT".format(f)] = np.zeros(test.shape[0])
+        feats.income_median(train, test, f)
+
     y = train['TARGET']
     del train['TARGET']
 
