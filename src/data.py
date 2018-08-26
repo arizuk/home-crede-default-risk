@@ -36,6 +36,8 @@ def load_prev():
     prev = prev[prev['NFLAG_LAST_APPL_IN_DAY'] == 1]
     prev = prev[prev['FLAG_LAST_APPL_PER_CONTRACT'] == 'Y']
 
+    prev['IS_ACTIVE'] = ((prev.NAME_CONTRACT_STATUS == 'Approved') & (prev.DAYS_TERMINATION > 0)).astype(int)
+
     # A lot of the continuous days variables have integers as missing value indicators.
     prev['DAYS_LAST_DUE'].replace(365243, np.nan, inplace=True)
     prev['DAYS_TERMINATION'].replace(365243, np.nan, inplace=True)
@@ -56,18 +58,21 @@ def load_prev():
 
     refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
 
-    last_pos = load_pos_for_prev()
-    last_pos.drop(['SK_ID_CURR'], inplace=True, axis=1)
-    last_pos.columns = ['last_pos_{}'.format(c) for c in last_pos.columns]
-
     # Approved
     approved = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved'].copy()
     approved.drop(['NAME_CONTRACT_STATUS', 'CODE_REJECT_REASON'], inplace=True, axis=1)
-    approved = approved.merge(right=last_pos.reset_index(), how="left", on="SK_ID_PREV")
 
     # To categorical feature
     approved['X_HOUR_APPR_PROCESS_START'] = approved['HOUR_APPR_PROCESS_START'].astype(str)
     del approved['HOUR_APPR_PROCESS_START']
+
+    approved['IS_TERMINATED'] = (approved['DAYS_TERMINATION'] < 0).astype(int)
+    approved['IS_EARLY_END'] = (
+        approved['DAYS_LAST_DUE_1ST_VERSION'] > approved['DAYS_LAST_DUE']
+        ).astype(int)
+    approved['IS_OVER_END'] = (
+        approved['DAYS_LAST_DUE_1ST_VERSION'] < approved['DAYS_LAST_DUE']
+        ).astype(int)
 
     prev_cat_features = [
         f_ for f_ in approved.columns if approved[f_].dtype == 'object'
@@ -96,19 +101,28 @@ def load_prev():
     # approved['weights'] = np.log(1 + 1 / ((-1 * approved.DAYS_DECISION) / 30))
     # avg_prev = weighted_average(df=approved, weight_col='weights', by_col='SK_ID_CURR')
 
+    # TODO: 見直し
     agg = {
         'AMT_ANNUITY': ['max', 'mean'],
         'AMT_APPLICATION': ['max', 'mean'],
         'AMT_CREDIT': ['max', 'mean'],
         'DAYS_DECISION': ['max', 'min'],
+        # ?
         'DAYS_FIRST_DRAWING': ['max', 'min'],
+        # 初回の支払い日
         'DAYS_FIRST_DUE': ['max', 'min'],
+        # 契約時の支払い完了予定日
         'DAYS_LAST_DUE_1ST_VERSION': ['max', 'min'],
+        # 支払い完了予定日。未来の場合が365243が入る
         'DAYS_LAST_DUE': ['max', 'min'],
+        # 支払い完了日。未来の場合が365243が入る
         'DAYS_TERMINATION': ['max', 'min'],
+        'IS_ACTIVE': ['sum'],
+        'IS_EARLY_END': ['mean', 'sum'],
+        'IS_OVER_END': ['mean', 'sum'],
     }
     for c in approved.columns:
-        if c == 'SK_ID_PREV' or c in agg:
+        if c == 'SK_ID_PREV' or c == 'SK_ID_CURR' or c in agg:
             continue
         if approved[c].dtype != 'object':
             agg[c] = ['mean']
@@ -277,38 +291,53 @@ def load_buro():
     del avg_buro['SK_ID_BUREAU']
     return avg_buro
 
-@pd_df_cache('pos_for_prev')
-def load_pos_for_prev():
-    pos = utils.read_csv('./input/POS_CASH_balance.csv')
-    pos = pos.sort_values(['SK_ID_PREV', 'MONTHS_BALANCE'])
-    pos_gr = pos.groupby('SK_ID_PREV')
-    last_pos = pos_gr.last()
-    last_pos['X_COMPLETED'] = (last_pos.NAME_CONTRACT_STATUS == 'Completed').astype(int)
-    # TODO: cancel
-    last_pos['X_ACTIVE'] = (last_pos.NAME_CONTRACT_STATUS != 'Completed').astype(int)
-    return last_pos
-
 @pd_df_cache('pos')
 def load_pos():
     pos = utils.read_csv('./input/POS_CASH_balance.csv')
 
-    # Features
-    aggregations = {
-        'MONTHS_BALANCE': ['max', 'mean', 'size'],
-        'SK_DPD': ['max', 'mean'],
-        'SK_DPD_DEF': ['max', 'mean']
+    pos = pos.sort_values(['SK_ID_PREV', 'MONTHS_BALANCE'])
+    prev_pos_gr = pos.groupby('SK_ID_PREV')
+
+    prev_last = prev_pos_gr.last()
+
+    # MONTHS_BALANCE == 1 and CNT_INSTALMENT_FUTURE > 1 なら支払いが残っているとみなす
+    prev_last['IS_ACTIVE'] = ((prev_last.MONTHS_BALANCE == -1) & (prev_last.CNT_INSTALMENT_FUTURE > 1)).astype(int)
+    prev_last['IS_DEMAND'] = (prev_last.NAME_CONTRACT_STATUS == 'Demand').astype(int)
+    prev_last_agg = {
+        'IS_ACTIVE': ['sum'],
+        'IS_DEMAND': ['sum', 'mean'],
     }
+    curr_prev_last = prev_last.groupby('SK_ID_CURR').agg(prev_last_agg)
+    curr_prev_last.columns = pd.Index(['LAST_' + e[0] + "_" + e[1].upper() for e in curr_prev_last.columns.tolist()])
 
-    # TODO:
-    # pos = pd.concat([pos, pd.get_dummies(pos['NAME_CONTRACT_STATUS'])], axis=1)
-    # for cat in cat_cols:
-    #     aggregations[cat] = ['mean']
+    active = prev_last[prev_last.IS_ACTIVE == 1]
+    active_agg = {
+        # activeな残り支払い回数
+        'CNT_INSTALMENT_FUTURE': ['sum'],
+    }
+    curr_active = active.groupby('SK_ID_CURR').agg(active_agg)
+    curr_active.columns = pd.Index(['ACTIVE_' + e[0] + "_" + e[1].upper() for e in curr_active.columns.tolist()])
 
-    pos_agg = pos.groupby('SK_ID_CURR').agg(aggregations)
+    pos['POS_OVERDUE'] = (pos.SK_DPD > 0).astype(int)
+    pos['POS_OVERDUE_DEF'] = (pos.SK_DPD_DEF > 0).astype(int)
+    pos_aggs = {
+        # 支払いがあった期間
+        'MONTHS_BALANCE': ['max', 'min'],
+        'SK_DPD': ['max', 'mean'],
+        'SK_DPD_DEF': ['max', 'mean'],
+        'POS_OVERDUE': ['sum'],
+        'POS_OVERDUE_DEF': ['sum']
+    }
+    pos_agg = pos.groupby('SK_ID_CURR').agg(pos_aggs)
     pos_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in pos_agg.columns.tolist()])
+    pos_agg['X_POS_COUNT'] = pos.groupby('SK_ID_CURR').size()
+    pos_agg['X_POS_OVERDUE_RATIO'] = pos['POS_OVERDUE'] / pos_agg['X_POS_COUNT']
+    pos_agg['X_POS_OVERDUE_DEF_RATIO'] = pos['POS_OVERDUE_DEF'] / pos_agg['X_POS_COUNT']
 
-    # Count pos cash accounts
-    pos_agg['POS_COUNT'] = pos.groupby('SK_ID_CURR').size()
+    pos_agg = pos_agg.merge(right=curr_prev_last.reset_index(), how="left", on="SK_ID_CURR")
+    pos_agg = pos_agg.merge(right=curr_active.reset_index(), how="left", on="SK_ID_CURR")
+    pos_agg = pos_agg.set_index('SK_ID_CURR')
+
     del pos
     gc.collect()
     return pos_agg
