@@ -17,6 +17,7 @@ from sklearn.model_selection import KFold, StratifiedKFold, train_test_split
 from src import feats
 from src import utils
 from src import data
+from src.feats import selection
 
 def lgbm_default_params():
     return {
@@ -149,12 +150,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     train, test, y = data.load_data()
-
-    # Features
-    excluded_feats = ['SK_ID_CURR']
-    excluded_feats = sum(list(map(lambda c: [c, f"{c}_x", f"{c}_y"], excluded_feats)), [])
-    features = [f_ for f_ in train.columns if f_ not in excluded_feats]
-
+    features = selection.select_features(train.column.values)
     print('Using features: {}'.format(len(features)), flush=True)
 
     if args.kfold:

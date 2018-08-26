@@ -55,9 +55,14 @@ def load_prev():
 
     refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
 
+    last_pos = load_pos_for_prev()
+    last_pos.drop(['SK_ID_CURR'], inplace=True, axis=1)
+    last_pos.columns = ['last_pos_{}'.format(c) for c in last_pos.columns]
+
     # Approved
     approved = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved'].copy()
     approved.drop(['NAME_CONTRACT_STATUS', 'CODE_REJECT_REASON'], inplace=True, axis=1)
+    approved = approved.merge(right=last_pos.reset_index(), how="left", on="SK_ID_PREV")
 
     # To categorical feature
     approved['X_HOUR_APPR_PROCESS_START'] = approved['HOUR_APPR_PROCESS_START'].astype(str)
@@ -117,6 +122,7 @@ def load_prev():
     del refused['AMT_APPLICATION']
     refused['CODE_REJECT_REASON'] = refused['CODE_REJECT_REASON'].astype('category')
 
+    # last app features
     prev_sorted = prev.sort_values(['SK_ID_CURR', 'DAYS_DECISION'])
     prev_app_sorted_groupby = prev_sorted.groupby(by=['SK_ID_CURR'])
 
@@ -269,6 +275,17 @@ def load_buro():
     del cnt_buro, sum_buro, buro, closed_buro
     del avg_buro['SK_ID_BUREAU']
     return avg_buro
+
+@logit
+def load_pos_for_prev():
+    pos = utils.read_csv('./input/POS_CASH_balance.csv')
+    pos = pos.sort_values(['SK_ID_PREV', 'MONTHS_BALANCE'])
+    pos_gr = pos.groupby('SK_ID_PREV')
+    last_pos = pos_gr.last()
+    last_pos['X_COMPLETED'] = (last_pos.NAME_CONTRACT_STATUS == 'Completed').astype(int)
+    # TODO: cancel
+    last_pos['X_ACTIVE'] = (last_pos.NAME_CONTRACT_STATUS != 'Completed').astype(int)
+    return last_pos
 
 @logit
 def load_pos():

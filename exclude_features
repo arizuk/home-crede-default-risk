@@ -1,0 +1,41 @@
+cc_bal_Refused
+cc_bal_Demand
+cc_bal_Approved
+FLAG_MOBIL
+prev_NFLAG_LAST_APPL_IN_DAY
+prev_FLAG_LAST_APPL_PER_CONTRACT_Y
+prev_X_HOUR_APPR_PROCESS_START_1
+prev_NAME_CASH_LOAN_PURPOSE_Buying a garage
+prev_NAME_GOODS_CATEGORY_Education
+prev_NAME_GOODS_CATEGORY_Animals
+buro_CREDIT_TYPE_Cash loan (non-earmarked)
+buro_CREDIT_ACTIVE_Sold
+buro_CREDIT_ACTIVE_Closed
+buro_CREDIT_ACTIVE_Bad debt
+buro_CREDIT_ACTIVE_Active
+prev_NAME_GOODS_CATEGORY_Fitness
+prev_NAME_CASH_LOAN_PURPOSE_Buying a holiday home / land
+prev_NAME_GOODS_CATEGORY_Weapon
+prev_NAME_PORTFOLIO_XNA
+prev_NAME_SELLER_INDUSTRY_Tourism
+prev_PRODUCT_COMBINATION_Cash
+prev_X_HOUR_APPR_PROCESS_START_23
+prev_X_HOUR_APPR_PROCESS_START_22
+buro_CREDIT_TYPE_Interbank credit
+buro_CREDIT_TYPE_Loan for purchase of shares (margin lending)
+buro_CREDIT_TYPE_Loan for the purchase of equipment
+prev_NAME_GOODS_CATEGORY_Additional Service
+buro_CREDIT_TYPE_Mobile operator loan
+buro_CREDIT_TYPE_Real estate loan
+buro_CREDIT_TYPE_Unknown type of loan
+buro_Bad debt
+prev_X_HOUR_APPR_PROCESS_START_0
+buro_X_Bad debt_Percent
+prev_NAME_PAYMENT_TYPE_Cashless from the account of the employer
+prev_NAME_CASH_LOAN_PURPOSE_Refusal to name the goal
+prev_NAME_CASH_LOAN_PURPOSE_Money for a third person
+prev_NAME_CASH_LOAN_PURPOSE_Hobby
+prev_NAME_CASH_LOAN_PURPOSE_Gasification / water supply
+prev_NAME_CASH_LOAN_PURPOSE_Car repairs
+prev_NAME_CASH_LOAN_PURPOSE_Buying a home
+prev_NAME_GOODS_CATEGORY_Insurance
