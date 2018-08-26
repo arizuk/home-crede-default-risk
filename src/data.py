@@ -57,9 +57,9 @@ def load_prev():
 
     # Approved
     prev = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved']
-    del prev['NAME_CONTRACT_STATUS']
-    del prev['CODE_REJECT_REASON']
+    prev.drop(['NAME_CONTRACT_STATUS', 'CODE_REJECT_REASON'], inplace=True, axis=1)
 
+    # To categorical feature
     prev['X_HOUR_APPR_PROCESS_START'] = prev['HOUR_APPR_PROCESS_START'].astype(str)
     del prev['HOUR_APPR_PROCESS_START']
 
@@ -68,9 +68,11 @@ def load_prev():
     ]
     prev_dum = pd.DataFrame()
     for f_ in prev_cat_features:
-        prev_dum = pd.concat([prev_dum, pd.get_dummies(prev[f_], prefix=f_).astype(np.uint8)], axis=1)
+        dummy_feats = pd.get_dummies(prev[f_], prefix=f_).astype(np.uint8)
+        prev_dum = pd.concat([prev_dum, dummy_feats], axis=1)
 
     prev = pd.concat([prev, prev_dum], axis=1)
+    # categ_columns = prev_dum.columns.values
     del prev_dum
     gc.collect()
 
@@ -88,21 +90,26 @@ def load_prev():
     # prev['weights'] = -1 / (prev.DAYS_DECISION//30)
     # prev['weights'] = np.log(1 + 1 / ((-1 * prev.DAYS_DECISION) / 30))
     # avg_prev = weighted_average(df=prev, weight_col='weights', by_col='SK_ID_CURR')
-    avg_prev = prev.groupby('SK_ID_CURR').mean()
-    del avg_prev['SK_ID_PREV']
 
-    # max
-    max_columns = [
-        'AMT_ANNUITY', 'AMT_APPLICATION', 'AMT_CREDIT', 'DAYS_DECISION', 'DAYS_FIRST_DRAWING', 'DAYS_FIRST_DUE',
-        'DAYS_LAST_DUE_1ST_VERSION', 'DAYS_LAST_DUE', 'DAYS_TERMINATION',
-    ]
-    max_prev = prev[['SK_ID_CURR'] + max_columns].groupby('SK_ID_CURR').max()
-    for f_ in max_columns:
-        if f_ in ['AMT_ANNUITY', 'AMT_APPLICATION', 'AMT_CREDIT']:
-            avg_prev['X_MAX_' + f_] = max_prev[f_]
-        else:
-            avg_prev[f_] = max_prev[f_]
-    del max_prev
+    agg = {
+        'AMT_ANNUITY': ['max', 'mean'],
+        'AMT_APPLICATION': ['max', 'mean'],
+        'AMT_CREDIT': ['max', 'mean'],
+        'DAYS_DECISION': ['max', 'min'],
+        'DAYS_FIRST_DRAWING': ['max', 'min'],
+        'DAYS_FIRST_DUE': ['max', 'min'],
+        'DAYS_LAST_DUE_1ST_VERSION': ['max', 'min'],
+        'DAYS_LAST_DUE': ['max', 'min'],
+        'DAYS_TERMINATION': ['max', 'min'],
+    }
+    for c in prev.columns:
+        if c == 'SK_ID_PREV' or c in agg:
+            continue
+        if prev[c].dtype != 'object':
+            agg[c] = ['mean']
+
+    prev_agg = prev.groupby('SK_ID_CURR').agg(agg)
+    prev_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in prev_agg.columns.tolist()])
 
     # refused
     refused = refused.sort_values(['DAYS_DECISION'], ascending=False)
@@ -112,13 +119,13 @@ def load_prev():
     refused['CODE_REJECT_REASON'] = refused['CODE_REJECT_REASON'].astype('category')
 
     # join
-    avg_prev = avg_prev.reset_index()
-    avg_prev = avg_prev.merge(right=cnt_prev.reset_index(), how="left", on="SK_ID_CURR")
-    avg_prev = avg_prev.merge(right=refused.reset_index(), how="left", on="SK_ID_CURR")
-    avg_prev = avg_prev.set_index('SK_ID_CURR')
+    prev_agg = prev_agg.reset_index()
+    prev_agg = prev_agg.merge(right=cnt_prev.reset_index(), how="left", on="SK_ID_CURR")
+    prev_agg = prev_agg.merge(right=refused.reset_index(), how="left", on="SK_ID_CURR")
+    prev_agg = prev_agg.set_index('SK_ID_CURR')
 
-    feats.prev_features(avg_prev)
-    return avg_prev
+    feats.prev_features(prev_agg)
+    return prev_agg
 
 @logit
 def load_inst():

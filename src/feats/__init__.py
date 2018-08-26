@@ -141,10 +141,10 @@ def app_features(df):
 
 def prev_features(df):
     # AMT APPLICATION
-    diff = (df['AMT_APPLICATION'] - df['AMT_CREDIT']) / df['AMT_CREDIT']
+    diff = (df['AMT_APPLICATION_MEAN'] - df['AMT_CREDIT_MEAN']) / df['AMT_CREDIT_MEAN']
     df['X_AMT_APPLICATION_DIFF_RATIO'] = diff
-    del df['AMT_APPLICATION']
+    del df['AMT_APPLICATION_MEAN']
 
 def combined_features(df):
-    df['X_APPROVTED_AMT_CREDIT_RATIO'] = df['AMT_CREDIT'] / df['prev_X_MAX_AMT_CREDIT']
+    df['X_APPROVTED_AMT_CREDIT_RATIO'] = df['AMT_CREDIT'] / df['prev_AMT_CREDIT_MAX']
     return True
