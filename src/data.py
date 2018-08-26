@@ -56,23 +56,22 @@ def load_prev():
     refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
 
     # Approved
-    prev = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved']
-    prev.drop(['NAME_CONTRACT_STATUS', 'CODE_REJECT_REASON'], inplace=True, axis=1)
+    approved = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved'].copy()
+    approved.drop(['NAME_CONTRACT_STATUS', 'CODE_REJECT_REASON'], inplace=True, axis=1)
 
     # To categorical feature
-    prev['X_HOUR_APPR_PROCESS_START'] = prev['HOUR_APPR_PROCESS_START'].astype(str)
-    del prev['HOUR_APPR_PROCESS_START']
+    approved['X_HOUR_APPR_PROCESS_START'] = approved['HOUR_APPR_PROCESS_START'].astype(str)
+    del approved['HOUR_APPR_PROCESS_START']
 
     prev_cat_features = [
-        f_ for f_ in prev.columns if prev[f_].dtype == 'object'
+        f_ for f_ in approved.columns if approved[f_].dtype == 'object'
     ]
     prev_dum = pd.DataFrame()
     for f_ in prev_cat_features:
-        dummy_feats = pd.get_dummies(prev[f_], prefix=f_).astype(np.uint8)
+        dummy_feats = pd.get_dummies(approved[f_], prefix=f_).astype(np.uint8)
         prev_dum = pd.concat([prev_dum, dummy_feats], axis=1)
 
-    prev = pd.concat([prev, prev_dum], axis=1)
-    # categ_columns = prev_dum.columns.values
+    approved = pd.concat([approved, prev_dum], axis=1)
     del prev_dum
     gc.collect()
 
@@ -85,11 +84,11 @@ def load_prev():
     #             continue
     #         d[c] = np.average(data[c], weights=weights)
     #     return pd.Series(d)
-    # avg_prev = prev.groupby('SK_ID_CURR').progress_apply(weighted_average)
+    # avg_prev = approved.groupby('SK_ID_CURR').progress_apply(weighted_average)
 
-    # prev['weights'] = -1 / (prev.DAYS_DECISION//30)
-    # prev['weights'] = np.log(1 + 1 / ((-1 * prev.DAYS_DECISION) / 30))
-    # avg_prev = weighted_average(df=prev, weight_col='weights', by_col='SK_ID_CURR')
+    # approved['weights'] = -1 / (approved.DAYS_DECISION//30)
+    # approved['weights'] = np.log(1 + 1 / ((-1 * approved.DAYS_DECISION) / 30))
+    # avg_prev = weighted_average(df=approved, weight_col='weights', by_col='SK_ID_CURR')
 
     agg = {
         'AMT_ANNUITY': ['max', 'mean'],
@@ -102,13 +101,13 @@ def load_prev():
         'DAYS_LAST_DUE': ['max', 'min'],
         'DAYS_TERMINATION': ['max', 'min'],
     }
-    for c in prev.columns:
+    for c in approved.columns:
         if c == 'SK_ID_PREV' or c in agg:
             continue
-        if prev[c].dtype != 'object':
+        if approved[c].dtype != 'object':
             agg[c] = ['mean']
 
-    prev_agg = prev.groupby('SK_ID_CURR').agg(agg)
+    prev_agg = approved.groupby('SK_ID_CURR').agg(agg)
     prev_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in prev_agg.columns.tolist()])
 
     # refused
@@ -118,10 +117,21 @@ def load_prev():
     del refused['AMT_APPLICATION']
     refused['CODE_REJECT_REASON'] = refused['CODE_REJECT_REASON'].astype('category')
 
+    prev_sorted = prev.sort_values(['SK_ID_CURR', 'DAYS_DECISION'])
+    prev_app_sorted_groupby = prev_sorted.groupby(by=['SK_ID_CURR'])
+
+    prev_sorted['X_PREV_WAS_APPROVED'] = ( prev_sorted['NAME_CONTRACT_STATUS'] == 'Approved').astype('int')
+    last_was_apporved = prev_app_sorted_groupby['X_PREV_WAS_APPROVED'].last().reset_index()
+
+    prev_sorted['X_PREV_WAS_REFUSED'] = (prev_sorted['NAME_CONTRACT_STATUS'] == 'Refused').astype('int')
+    last_was_refused = prev_app_sorted_groupby['X_PREV_WAS_REFUSED'].last().reset_index()
+
     # join
     prev_agg = prev_agg.reset_index()
     prev_agg = prev_agg.merge(right=cnt_prev.reset_index(), how="left", on="SK_ID_CURR")
     prev_agg = prev_agg.merge(right=refused.reset_index(), how="left", on="SK_ID_CURR")
+    prev_agg = prev_agg.merge(right=last_was_apporved.reset_index(), how="left", on="SK_ID_CURR")
+    prev_agg = prev_agg.merge(right=last_was_refused.reset_index(), how="left", on="SK_ID_CURR")
     prev_agg = prev_agg.set_index('SK_ID_CURR')
 
     feats.prev_features(prev_agg)

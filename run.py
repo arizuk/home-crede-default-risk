@@ -20,20 +20,19 @@ from src import data
 
 def lgbm_default_params():
     return {
-        'n_estimators': 5000,
-        'learning_rate': 0.02,
-        'num_leaves': 63,
-        'colsample_bytree': .1,
-        'subsample': 0.8,
-        'subsample_freq': 5,
-        'min_child_samples': 70,
-        'max_bin': 200,
-        'max_depth': 7,
-        'reg_alpha': 0.01,
-        'reg_lambda': 30,
-        'min_split_gain': .5,
-        'device': "gpu",
-        'verbose': -1,
+        "n_estimators": 5000,
+        "learning_rate": 0.02,
+        "num_leaves": 30,
+        "colsample_bytree": 0.2,
+        "subsample": 0.8,
+        "subsample_freq": 5,
+        "max_bin": 200,
+        "max_depth": -1,
+        "reg_alpha": 0,
+        "reg_lambda": 100,
+        "min_split_gain": 0.5,
+        "device": "gpu",
+        "verbose": -1
     }
 
 
