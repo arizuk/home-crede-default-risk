@@ -162,34 +162,46 @@ def load_prev():
 def load_inst():
     inst = utils.read_csv('./input/installments_payments.csv')
 
-    inst['X_DPD'] = inst['DAYS_ENTRY_PAYMENT'] - inst['DAYS_INSTALMENT']
-    inst['X_OVERDUE'] = inst['DAYS_INSTALMENT'] < inst['DAYS_ENTRY_PAYMENT']
-    inst['X_OVER_PAYMENT_RATIO'] = (inst['AMT_PAYMENT'] - inst['AMT_INSTALMENT']) / inst['AMT_PAYMENT']
+    def agg(df):
+        df['X_DPD'] = df['DAYS_ENTRY_PAYMENT'] - df['DAYS_INSTALMENT']
+        df['X_OVERDUE'] = df['DAYS_INSTALMENT'] < df['DAYS_ENTRY_PAYMENT']
+        df['X_OVER_PAYMENT_RATIO'] = (df['AMT_PAYMENT'] - df['AMT_INSTALMENT']) / df['AMT_PAYMENT']
 
-    # NUM_INSTALMENT_VERSION
-    inst_version = inst[['SK_ID_CURR', 'SK_ID_PREV', 'NUM_INSTALMENT_VERSION']].groupby(['SK_ID_CURR', 'SK_ID_PREV']).max()
-    inst_version = inst_version.reset_index().groupby('SK_ID_CURR').mean()
-    inst['X_NUM_INSTALMENT_VERSION'] = inst['SK_ID_CURR'].map(inst_version['NUM_INSTALMENT_VERSION'])
-    del inst['NUM_INSTALMENT_VERSION']
-    del inst_version
+        # NUM_INSTALMENT_VERSION
+        inst_version = df[['SK_ID_CURR', 'SK_ID_PREV', 'NUM_INSTALMENT_VERSION']].groupby(['SK_ID_CURR', 'SK_ID_PREV']).max()
+        inst_version = inst_version.reset_index().groupby('SK_ID_CURR').mean()
+        df['X_NUM_INSTALMENT_VERSION'] = df['SK_ID_CURR'].map(inst_version['NUM_INSTALMENT_VERSION'])
+        del df['NUM_INSTALMENT_VERSION']
+        del inst_version
 
-    # 支払い回数
-    nb_prevs = inst[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
-    inst['X_CNT_INSTALLMENT'] = inst['SK_ID_CURR'].map(nb_prevs['SK_ID_PREV'])
+        # 支払い回数
+        nb_prevs = df[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
+        df['X_CNT_INSTALLMENT'] = df['SK_ID_CURR'].map(nb_prevs['SK_ID_PREV'])
 
-    # 遅延回数
-    nb_overdues = inst[inst['X_OVERDUE']][['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
-    inst['X_CNT_OVERDUE'] = inst['SK_ID_CURR'].map(nb_overdues['SK_ID_PREV'])
-    inst['X_CNT_OVERDUE'] = inst['X_CNT_OVERDUE'].fillna(0)
-    inst['X_OVERDUE_RATE'] = inst['X_CNT_OVERDUE'] / inst['X_CNT_INSTALLMENT']
+        # 遅延回数
+        nb_overdues = df[df['X_OVERDUE']][['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
+        df['X_CNT_OVERDUE'] = df['SK_ID_CURR'].map(nb_overdues['SK_ID_PREV'])
+        df['X_CNT_OVERDUE'] = df['X_CNT_OVERDUE'].fillna(0)
+        df['X_OVERDUE_RATE'] = df['X_CNT_OVERDUE'] / df['X_CNT_INSTALLMENT']
 
-    avg_inst = inst.groupby('SK_ID_CURR').mean()
-    del inst
-    gc.collect()
+        avg_inst = df.groupby('SK_ID_CURR').mean()
+        del df
+        gc.collect()
 
-    for c in ['SK_ID_PREV', 'NUM_INSTALMENT_NUMBER', 'DAYS_INSTALMENT', 'DAYS_ENTRY_PAYMENT', 'X_OVERDUE']:
-        del avg_inst[c]
+        for c in ['SK_ID_PREV', 'NUM_INSTALMENT_NUMBER', 'DAYS_INSTALMENT', 'DAYS_ENTRY_PAYMENT', 'X_OVERDUE']:
+            del avg_inst[c]
+        return avg_inst
 
+    inst = inst.sort_values(['SK_ID_PREV', 'NUM_INSTALMENT_NUMBER'])
+    head_inst = inst.groupby('SK_ID_PREV').head(3).copy()
+
+    avg_inst = agg(inst)
+    avg_head_inst = agg(head_inst)
+    avg_head_inst.columns = ['head_{}'.format(c) for c in avg_head_inst.columns]
+
+    avg_inst = avg_inst.reset_index()
+    avg_inst = avg_inst.merge(right=avg_head_inst.reset_index(), how="left", on="SK_ID_CURR")
+    avg_inst = avg_inst.set_index('SK_ID_CURR')
     return avg_inst
 
 @logit
@@ -318,27 +330,36 @@ def load_pos():
     curr_active = active.groupby('SK_ID_CURR').agg(active_agg)
     curr_active.columns = pd.Index(['ACTIVE_' + e[0] + "_" + e[1].upper() for e in curr_active.columns.tolist()])
 
-    pos['POS_OVERDUE'] = (pos.SK_DPD > 0).astype(int)
-    pos['POS_OVERDUE_DEF'] = (pos.SK_DPD_DEF > 0).astype(int)
-    pos_aggs = {
-        # 支払いがあった期間
-        'MONTHS_BALANCE': ['max', 'min'],
-        'SK_DPD': ['max', 'mean'],
-        'SK_DPD_DEF': ['max', 'mean'],
-        'POS_OVERDUE': ['sum'],
-        'POS_OVERDUE_DEF': ['sum']
-    }
-    pos_agg = pos.groupby('SK_ID_CURR').agg(pos_aggs)
-    pos_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in pos_agg.columns.tolist()])
-    pos_agg['X_POS_COUNT'] = pos.groupby('SK_ID_CURR').size()
-    pos_agg['X_POS_OVERDUE_RATIO'] = pos['POS_OVERDUE'] / pos_agg['X_POS_COUNT']
-    pos_agg['X_POS_OVERDUE_DEF_RATIO'] = pos['POS_OVERDUE_DEF'] / pos_agg['X_POS_COUNT']
+    def agg(df):
+        df['POS_OVERDUE'] = (df.SK_DPD > 0).astype(int)
+        df['POS_OVERDUE_DEF'] = (df.SK_DPD_DEF > 0).astype(int)
+        pos_aggs = {
+            # 支払いがあった期間
+            'MONTHS_BALANCE': ['max', 'min'],
+            'SK_DPD': ['max', 'mean'],
+            'SK_DPD_DEF': ['max', 'mean'],
+            'POS_OVERDUE': ['sum'],
+            'POS_OVERDUE_DEF': ['sum']
+        }
+        pos_agg = df.groupby('SK_ID_CURR').agg(pos_aggs)
+        pos_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in pos_agg.columns.tolist()])
+        pos_agg['X_POS_COUNT'] = pos.groupby('SK_ID_CURR').size()
+        pos_agg['X_POS_OVERDUE_RATIO'] = pos['POS_OVERDUE'] / pos_agg['X_POS_COUNT']
+        pos_agg['X_POS_OVERDUE_DEF_RATIO'] = pos['POS_OVERDUE_DEF'] / pos_agg['X_POS_COUNT']
+        return pos_agg
 
+    pos_agg = agg(pos)
+
+    head_pos = prev_pos_gr.head(3).copy()
+    head_pos_agg = agg(head_pos)
+    head_pos_agg.columns = ['head_{}'.format(c) for c in head_pos_agg.columns]
+
+    pos_agg = pos_agg.merge(right=head_pos_agg.reset_index(), how="left", on="SK_ID_CURR")
     pos_agg = pos_agg.merge(right=curr_prev_last.reset_index(), how="left", on="SK_ID_CURR")
     pos_agg = pos_agg.merge(right=curr_active.reset_index(), how="left", on="SK_ID_CURR")
     pos_agg = pos_agg.set_index('SK_ID_CURR')
 
-    del pos
+    del pos, head_pos, head_pos_agg, curr_prev_last, curr_active
     gc.collect()
     return pos_agg
 

@@ -1,9 +1,9 @@
 import pandas as pd
 
 
-prefix = "kernel-102"
+prefix = "kernel-126"
 df1 = pd.read_csv('./blends/WEIGHT_AVERAGE_RANK2.csv')
-df2 = pd.read_csv('./experiments/102-lgbm-kfold-0.792530.csv')
+df2 = pd.read_csv('./experiments/126-lgbm-kfold-0.792925.csv')
 
 ratios = [0.5]
 for i, ratio in enumerate(ratios):
