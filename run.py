@@ -23,12 +23,14 @@ def lgbm_default_params():
         'n_estimators': 5000,
         'learning_rate': 0.02,
         'num_leaves': 63,
-        'colsample_bytree': .2,
-        'subsample': .8,
+        'colsample_bytree': .1,
+        'subsample': 0.8,
         'subsample_freq': 5,
-        'max_depth': 5,
-        'reg_alpha': .001,
-        'reg_lambda': .9,
+        'min_child_samples': 70,
+        'max_bin': 200,
+        'max_depth': 7,
+        'reg_alpha': 0.01,
+        'reg_lambda': 30,
         'min_split_gain': .5,
         'device': "gpu",
         'verbose': -1,
@@ -57,7 +59,7 @@ def lgbm_train_kfold(train, y, test, features, random_state=42):
         with utils.timeit():
             clf.fit(trn_x, trn_y,
                     eval_set= [(trn_x, trn_y), (val_x, val_y)],
-                    eval_metric='auc', verbose=250, early_stopping_rounds=150
+                    eval_metric='auc', verbose=250, early_stopping_rounds=200
                 )
 
         trn_preds[trn_idx] = clf.predict_proba(trn_x, num_iteration=clf.best_iteration_)[:, 1]
@@ -95,7 +97,8 @@ def lgbm_train(train, y, test, features):
     test_preds = np.zeros(test.shape[0])
     trn_aucs = []
     aucs = []
-    random_states = [1, 42]
+    # random_states = [1, 42]
+    random_states = [42, 1]
 
     params = lgbm_default_params()
 
@@ -108,7 +111,7 @@ def lgbm_train(train, y, test, features):
 
         eval_set = [(trn_x, trn_y), (val_x, val_y)]
         with utils.timeit():
-            clf.fit(trn_x, trn_y, eval_set=eval_set, eval_metric='auc', verbose=250, early_stopping_rounds=150)
+            clf.fit(trn_x, trn_y, eval_set=eval_set, eval_metric='auc', verbose=250, early_stopping_rounds=200)
 
         trn_preds = clf.predict_proba(trn_x, num_iteration=clf.best_iteration_)[:, 1]
         val_preds = clf.predict_proba(val_x, num_iteration=clf.best_iteration_)[:, 1]
@@ -185,6 +188,7 @@ if __name__ == '__main__':
     reg = re.compile(r"(.*_)?X_")
     handmade_features = [x for x in features if reg.match(x)]
     for f in handmade_features:
-        print('{}: {}'.format(f, clf.feature_importances_[features.index(f)]))
+        pass
+        # print('{}: {}'.format(f, clf.feature_importances_[features.index(f)]))
 
     # plot_importance(clf, max_num_features=100, figsize=(20, 20))
