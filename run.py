@@ -150,7 +150,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     train, test, y = data.load_data()
-    features = selection.select_features(train.column.values)
+    features = selection.select_features(train.columns.values)
     print('Using features: {}'.format(len(features)), flush=True)
 
     if args.kfold:

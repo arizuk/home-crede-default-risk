@@ -103,6 +103,23 @@ def read_csv(file):
     gc.collect()
     return df
 
+def pd_df_cache(key):
+    def cache(func):
+        def wrapper(*args,**kwargs):
+            start = timer()
+            cache_file = f'./cache/{key}.pkl'
+            if os.path.exists(cache_file):
+                df = pickle.load(open(cache_file, 'rb'))
+            else:
+                df = func(*args,**kwargs)
+                df.to_pickle(cache_file)
+                gc.collect()
+            end = timer()
+            elapsed = humanfriendly.format_timespan(end - start)
+            print('{} done. {}'.format(func.__name__, elapsed), flush=True)
+            return df
+        return wrapper
+    return cache
 
 @contextlib.contextmanager
 def timeit():

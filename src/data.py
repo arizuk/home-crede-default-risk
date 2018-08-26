@@ -8,6 +8,7 @@ from tqdm import tqdm
 from src import utils
 from src import feats
 from src.utils import logit
+from src.utils import pd_df_cache
 
 tqdm.pandas()
 
@@ -29,7 +30,7 @@ def weighted_average(df, weight_col, by_col):
         avg[c] = g[c] / g[f'{c}_notnull']
     return avg
 
-@logit
+@pd_df_cache('prev')
 def load_prev():
     prev = utils.read_csv('./input/previous_application.csv')
     prev = prev[prev['NFLAG_LAST_APPL_IN_DAY'] == 1]
@@ -143,7 +144,7 @@ def load_prev():
     feats.prev_features(prev_agg)
     return prev_agg
 
-@logit
+@pd_df_cache('inst')
 def load_inst():
     inst = utils.read_csv('./input/installments_payments.csv')
 
@@ -186,7 +187,7 @@ def load_last():
     del last['SK_ID_PREV']
     return last
 
-@logit
+@pd_df_cache('buro_balance')
 def load_buro_balance():
     buro_bal = utils.read_csv('./input/bureau_balance.csv')
     buro_bal = buro_bal[buro_bal.STATUS != 'C']
@@ -210,7 +211,7 @@ def load_buro_balance():
     cnt_buro_bal.fillna(0)
     return cnt_buro_bal
 
-@logit
+@pd_df_cache('buro')
 def load_buro():
     buro = utils.read_csv('./input/bureau.csv')
     buro.loc[buro['DAYS_CREDIT_ENDDATE'] < -40000, 'DAYS_CREDIT_ENDDATE'] = np.nan
@@ -276,7 +277,7 @@ def load_buro():
     del avg_buro['SK_ID_BUREAU']
     return avg_buro
 
-@logit
+@pd_df_cache('pos_for_prev')
 def load_pos_for_prev():
     pos = utils.read_csv('./input/POS_CASH_balance.csv')
     pos = pos.sort_values(['SK_ID_PREV', 'MONTHS_BALANCE'])
@@ -287,7 +288,7 @@ def load_pos_for_prev():
     last_pos['X_ACTIVE'] = (last_pos.NAME_CONTRACT_STATUS != 'Completed').astype(int)
     return last_pos
 
-@logit
+@pd_df_cache('pos')
 def load_pos():
     pos = utils.read_csv('./input/POS_CASH_balance.csv')
 
@@ -312,7 +313,7 @@ def load_pos():
     gc.collect()
     return pos_agg
 
-@logit
+@pd_df_cache('cc_bal')
 def load_cc_bal():
     cc_bal = utils.read_csv('./input/credit_card_balance.csv')
 
