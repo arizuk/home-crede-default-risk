@@ -12,7 +12,6 @@ from src.utils import pd_df_cache
 
 tqdm.pandas()
 
-
 def weighted_average(df, weight_col, by_col):
     columns = [c for c in df.columns if df[c].dtype != 'object' and c not in [weight_col, by_col]]
 
@@ -33,130 +32,7 @@ def weighted_average(df, weight_col, by_col):
 @pd_df_cache('prev')
 def load_prev():
     prev = utils.read_csv('./input/previous_application.csv')
-    prev = prev[prev['NFLAG_LAST_APPL_IN_DAY'] == 1]
-    prev = prev[prev['FLAG_LAST_APPL_PER_CONTRACT'] == 'Y']
-
-    prev['IS_ACTIVE'] = ((prev.NAME_CONTRACT_STATUS == 'Approved') & (prev.DAYS_TERMINATION > 0)).astype(int)
-
-    # A lot of the continuous days variables have integers as missing value indicators.
-    prev['DAYS_LAST_DUE'].replace(365243, np.nan, inplace=True)
-    prev['DAYS_TERMINATION'].replace(365243, np.nan, inplace=True)
-    prev['DAYS_FIRST_DRAWING'].replace(365243, np.nan, inplace=True)
-    prev['DAYS_FIRST_DUE'].replace(365243, np.nan, inplace=True)
-    prev['DAYS_LAST_DUE_1ST_VERSION'].replace(365243, np.nan, inplace=True)
-
-    cnt_prev = (
-        prev[['SK_ID_CURR', 'SK_ID_PREV', 'NAME_CONTRACT_STATUS']]
-        .groupby(['SK_ID_CURR', 'NAME_CONTRACT_STATUS'])
-        .count().unstack().fillna(0)
-         )
-    cnt_prev.columns = cnt_prev.columns.get_level_values(1)
-    sum_cnt_prev = cnt_prev.sum(axis=1)
-    for c_ in cnt_prev.columns:
-        cnt_prev['X_' + c_ + '_Percent'] = cnt_prev[c_] / sum_cnt_prev
-    cnt_prev.fillna(0)
-
-    refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
-
-    # Approved
-    approved = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved'].copy()
-    approved.drop(['NAME_CONTRACT_STATUS', 'CODE_REJECT_REASON'], inplace=True, axis=1)
-
-    # To categorical feature
-    approved['X_HOUR_APPR_PROCESS_START'] = approved['HOUR_APPR_PROCESS_START'].astype(str)
-    del approved['HOUR_APPR_PROCESS_START']
-
-    approved['IS_TERMINATED'] = (approved['DAYS_TERMINATION'] < 0).astype(int)
-    approved['IS_EARLY_END'] = (
-        approved['DAYS_LAST_DUE_1ST_VERSION'] > approved['DAYS_LAST_DUE']
-        ).astype(int)
-    approved['IS_OVER_END'] = (
-        approved['DAYS_LAST_DUE_1ST_VERSION'] < approved['DAYS_LAST_DUE']
-        ).astype(int)
-
-    prev_cat_features = [
-        f_ for f_ in approved.columns if approved[f_].dtype == 'object'
-    ]
-    prev_dum = pd.DataFrame()
-    for f_ in prev_cat_features:
-        dummy_feats = pd.get_dummies(approved[f_], prefix=f_).astype(np.uint8)
-        prev_dum = pd.concat([prev_dum, dummy_feats], axis=1)
-
-    approved = pd.concat([approved, prev_dum], axis=1)
-    del prev_dum
-    gc.collect()
-
-    # Weighted average
-    # def weighted_average(data):
-    #     d = {}
-    #     weights = -1 / data['DAYS_DECISION']
-    #     for c in data.columns:
-    #         if data[c].dtype == 'object':
-    #             continue
-    #         d[c] = np.average(data[c], weights=weights)
-    #     return pd.Series(d)
-    # avg_prev = approved.groupby('SK_ID_CURR').progress_apply(weighted_average)
-
-    # approved['weights'] = -1 / (approved.DAYS_DECISION//30)
-    # approved['weights'] = np.log(1 + 1 / ((-1 * approved.DAYS_DECISION) / 30))
-    # avg_prev = weighted_average(df=approved, weight_col='weights', by_col='SK_ID_CURR')
-
-    # TODO: 見直し
-    agg = {
-        'AMT_ANNUITY': ['max', 'mean'],
-        'AMT_APPLICATION': ['max', 'mean'],
-        'AMT_CREDIT': ['max', 'mean'],
-        'DAYS_DECISION': ['max', 'min'],
-        # ?
-        'DAYS_FIRST_DRAWING': ['max', 'min'],
-        # 初回の支払い日
-        'DAYS_FIRST_DUE': ['max', 'min'],
-        # 契約時の支払い完了予定日
-        'DAYS_LAST_DUE_1ST_VERSION': ['max', 'min'],
-        # 支払い完了予定日。未来の場合が365243が入る
-        'DAYS_LAST_DUE': ['max', 'min'],
-        # 支払い完了日。未来の場合が365243が入る
-        'DAYS_TERMINATION': ['max', 'min'],
-        'IS_ACTIVE': ['sum'],
-        'IS_EARLY_END': ['mean', 'sum'],
-        'IS_OVER_END': ['mean', 'sum'],
-    }
-    for c in approved.columns:
-        if c == 'SK_ID_PREV' or c == 'SK_ID_CURR' or c in agg:
-            continue
-        if approved[c].dtype != 'object':
-            agg[c] = ['mean']
-
-    prev_agg = approved.groupby('SK_ID_CURR').agg(agg)
-    prev_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in prev_agg.columns.tolist()])
-
-    # refused
-    refused = refused.sort_values(['DAYS_DECISION'], ascending=False)
-    refused = refused[['SK_ID_CURR', 'CODE_REJECT_REASON', 'AMT_APPLICATION']].groupby('SK_ID_CURR').nth(0)
-    refused['X_REFUSED_AMT_APPLICATION'] = refused['AMT_APPLICATION']
-    del refused['AMT_APPLICATION']
-    refused['CODE_REJECT_REASON'] = refused['CODE_REJECT_REASON'].astype('category')
-
-    # last app features
-    prev_sorted = prev.sort_values(['SK_ID_CURR', 'DAYS_DECISION'])
-    prev_app_sorted_groupby = prev_sorted.groupby(by=['SK_ID_CURR'])
-
-    prev_sorted['X_PREV_WAS_APPROVED'] = ( prev_sorted['NAME_CONTRACT_STATUS'] == 'Approved').astype('int')
-    last_was_apporved = prev_app_sorted_groupby['X_PREV_WAS_APPROVED'].last().reset_index()
-
-    prev_sorted['X_PREV_WAS_REFUSED'] = (prev_sorted['NAME_CONTRACT_STATUS'] == 'Refused').astype('int')
-    last_was_refused = prev_app_sorted_groupby['X_PREV_WAS_REFUSED'].last().reset_index()
-
-    # join
-    prev_agg = prev_agg.reset_index()
-    prev_agg = prev_agg.merge(right=cnt_prev.reset_index(), how="left", on="SK_ID_CURR")
-    prev_agg = prev_agg.merge(right=refused.reset_index(), how="left", on="SK_ID_CURR")
-    prev_agg = prev_agg.merge(right=last_was_apporved.reset_index(), how="left", on="SK_ID_CURR")
-    prev_agg = prev_agg.merge(right=last_was_refused.reset_index(), how="left", on="SK_ID_CURR")
-    prev_agg = prev_agg.set_index('SK_ID_CURR')
-
-    feats.prev_features(prev_agg)
-    return prev_agg
+    return feats.previous.engineering(prev)
 
 @pd_df_cache('inst')
 def load_inst():

@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from src.utils import logit
+from src.feats import previous
 
 @logit
 def encode_categories(train, test, y, features):
@@ -138,12 +139,6 @@ def app_features(df):
 
     for c in columns:
       del df[c]
-
-def prev_features(df):
-    # AMT APPLICATION
-    diff = (df['AMT_APPLICATION_MEAN'] - df['AMT_CREDIT_MEAN']) / df['AMT_CREDIT_MEAN']
-    df['X_AMT_APPLICATION_DIFF_RATIO'] = diff
-    del df['AMT_APPLICATION_MEAN']
 
 def combined_features(df):
     df['X_APPROVTED_AMT_CREDIT_RATIO'] = df['AMT_CREDIT'] / df['prev_AMT_CREDIT_MAX']
