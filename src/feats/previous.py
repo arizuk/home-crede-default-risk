@@ -42,21 +42,20 @@ def engineering(prev):
     prev['DAYS_FIRST_DUE'].replace(365243, np.nan, inplace=True)
     prev['DAYS_LAST_DUE_1ST_VERSION'].replace(365243, np.nan, inplace=True)
 
+    prev['IS_TERMINATED'] = (prev['DAYS_TERMINATION'] < 0).astype(int)
+    prev['IS_EARLY_END'] = (prev['DAYS_LAST_DUE_1ST_VERSION'] > prev['DAYS_LAST_DUE'] ).astype(int)
+    prev['IS_DEFERED_END'] = (prev['DAYS_LAST_DUE_1ST_VERSION'] < prev['DAYS_LAST_DUE']).astype(int)
+
     # Agg
-    prev_agg = pd.DataFrame({ 'SK_ID_CURR': prev['SK_ID_CURR'].unique() })
+    prev_agg = prev.groupby('SK_ID_CURR').size()
+    prev_agg.columns = ['X_PREV_COUNT']
+    prev_agg.reset_index()
 
     # Approved
     approved = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved'].copy()
     approved.drop(['NAME_CONTRACT_STATUS', 'CODE_REJECT_REASON'], inplace=True, axis=1)
     approved['X_HOUR_APPR_PROCESS_START'] = approved['HOUR_APPR_PROCESS_START'].astype(str) # To categorical feature
     del approved['HOUR_APPR_PROCESS_START']
-    approved['IS_TERMINATED'] = (approved['DAYS_TERMINATION'] < 0).astype(int)
-    approved['IS_EARLY_END'] = (
-        approved['DAYS_LAST_DUE_1ST_VERSION'] > approved['DAYS_LAST_DUE']
-        ).astype(int)
-    approved['IS_OVER_END'] = (
-        approved['DAYS_LAST_DUE_1ST_VERSION'] < approved['DAYS_LAST_DUE']
-        ).astype(int)
     approved = dummy_encoding(approved)
     agg = {
         'AMT_ANNUITY': ['max', 'mean'],
@@ -65,17 +64,14 @@ def engineering(prev):
         'DAYS_DECISION': ['max', 'min'],
         # ?
         'DAYS_FIRST_DRAWING': ['max', 'min'],
-        # 初回の支払い日
-        'DAYS_FIRST_DUE': ['max', 'min'],
-        # 契約時の支払い完了予定日
-        'DAYS_LAST_DUE_1ST_VERSION': ['max', 'min'],
-        # 支払い完了予定日。未来の場合が365243が入る
-        'DAYS_LAST_DUE': ['max', 'min'],
-        # 支払い完了日。未来の場合が365243が入る
-        'DAYS_TERMINATION': ['max', 'min'],
+        # 'DAYS_FIRST_DUE': ['max', 'min'], # 初回の支払い日
+        # 'DAYS_LAST_DUE_1ST_VERSION': ['max', 'min'], # 契約時の支払い完了予定日
+        'DAYS_LAST_DUE': ['max'], # 支払い完了予定日。未来の場合が365243が入る
+        'DAYS_TERMINATION': ['max'], # 支払い完了日。未来の場合が365243が入る
         'IS_ACTIVE': ['sum'],
         'IS_EARLY_END': ['mean', 'sum'],
-        'IS_OVER_END': ['mean', 'sum'],
+        'IS_DEFERED_END': ['mean', 'sum'],
+        'CNT_PAYMENT': ['mean'],
     }
     for c in approved.columns:
         if c == 'SK_ID_PREV' or c == 'SK_ID_CURR' or c in agg:
