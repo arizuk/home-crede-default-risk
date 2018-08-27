@@ -19,7 +19,10 @@ from src import utils
 from src import data
 from src.feats import selection
 
-def get_lgbm_params(config_id=1):
+CONFIG_ID=2
+
+def get_lgbm_params():
+    config_id = CONFIG_ID
     json_data=open("config/{}.json".format(config_id)).read()
     data = json.loads(json_data)
     print("[CONFIG] {}.json {}".format(config_id, data))
@@ -35,7 +38,7 @@ def lgbm_train_kfold(train, y, test, features, random_state=42):
     oof_preds = np.zeros(train.shape[0])
     test_preds = np.zeros(test.shape[0])
 
-    params = get_lgbm_params(config_id=1)
+    params = get_lgbm_params()
 
     for n_fold, (trn_idx, val_idx) in enumerate(folds.split(train, y)):
         train[categorical_feats] = categ_train #restore
@@ -88,7 +91,7 @@ def lgbm_train(train, y, test, features):
     # random_states = [1, 42]
     random_states = [42, 1]
 
-    params = get_lgbm_params(config_id=1)
+    params = get_lgbm_params()
 
     for i in range(0, 2):
         train[categorical_feats] = categ_train #restore

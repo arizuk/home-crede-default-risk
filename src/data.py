@@ -80,15 +80,6 @@ def load_inst():
     avg_inst = avg_inst.set_index('SK_ID_CURR')
     return avg_inst
 
-@logit
-def load_last():
-    last = pickle.load(open('./features/last_application.pkl', 'rb'))
-    feats.prev_features(last)
-    for f_ in [f for f in last.columns if last[f].dtype == 'object']:
-        last[f_], indexer = pd.factorize(last[f_])
-    del last['SK_ID_PREV']
-    return last
-
 @pd_df_cache('buro_balance')
 def load_buro_balance():
     buro_bal = utils.read_csv('./input/bureau_balance.csv')
@@ -292,14 +283,12 @@ def load_data(debug=False):
 
     train, test, y = load_train_test()
     prev = load_prev()
-    # last = load_last()
     buro = load_buro()
     pos = load_pos()
     cc_bal = load_cc_bal()
     inst = load_inst()
 
     prev.columns = ['prev_{}'.format(c) for c in prev.columns]
-    # last.columns = ['last_{}'.format(c) for c in last.columns]
     buro.columns = ['buro_{}'.format(c) for c in buro.columns]
     inst.columns = ['inst_{}'.format(c) for c in inst.columns]
     pos.columns = ['pos_{}'.format(c) for c in pos.columns]
@@ -307,7 +296,6 @@ def load_data(debug=False):
 
     def dmerge(df):
         df = df.merge(right=prev.reset_index(), how='left', on='SK_ID_CURR')
-        # df = df.merge(right=last.reset_index(), how='left', on='SK_ID_CURR')
         df = df.merge(right=buro.reset_index(), how='left', on='SK_ID_CURR')
         df = df.merge(right=inst.reset_index(), how='left', on='SK_ID_CURR')
         df = df.merge(right=pos.reset_index(), how='left', on='SK_ID_CURR')
