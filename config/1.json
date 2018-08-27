@@ -1,0 +1,13 @@
+{
+  "n_estimators": 5000,
+  "learning_rate": 0.01,
+  "num_leaves": 63,
+  "colsample_bytree": 0.4,
+  "subsample": 0.8,
+  "subsample_freq": 5,
+  "max_depth": 5,
+  "reg_alpha": 0.001,
+  "reg_lambda": 0.9,
+  "min_split_gain": 0.01,
+  "verbose": "-1"
+}

@@ -19,23 +19,11 @@ from src import utils
 from src import data
 from src.feats import selection
 
-def lgbm_default_params():
-    return {
-        "n_estimators": 5000,
-        "learning_rate": 0.02,
-        "num_leaves": 30,
-        "colsample_bytree": 0.2,
-        "subsample": 0.8,
-        "subsample_freq": 5,
-        "max_bin": 200,
-        "max_depth": -1,
-        "reg_alpha": 0,
-        "reg_lambda": 100,
-        "min_split_gain": 0.5,
-        "device": "gpu",
-        "verbose": -1
-    }
-
+def get_lgbm_params(config_id=1):
+    json_data=open("config/{}.json".format(config_id)).read()
+    data = json.loads(json_data)
+    print("[CONFIG] {}.json {}".format(config_id, data))
+    return data
 
 def lgbm_train_kfold(train, y, test, features, random_state=42):
     categorical_feats = [ f for f in train.columns if train[f].dtype == 'object' ]
@@ -47,7 +35,7 @@ def lgbm_train_kfold(train, y, test, features, random_state=42):
     oof_preds = np.zeros(train.shape[0])
     test_preds = np.zeros(test.shape[0])
 
-    params = lgbm_default_params()
+    params = get_lgbm_params(config_id=1)
 
     for n_fold, (trn_idx, val_idx) in enumerate(folds.split(train, y)):
         train[categorical_feats] = categ_train #restore
@@ -100,7 +88,7 @@ def lgbm_train(train, y, test, features):
     # random_states = [1, 42]
     random_states = [42, 1]
 
-    params = lgbm_default_params()
+    params = get_lgbm_params(config_id=1)
 
     for i in range(0, 2):
         train[categorical_feats] = categ_train #restore
