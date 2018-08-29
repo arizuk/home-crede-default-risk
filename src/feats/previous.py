@@ -124,15 +124,18 @@ def engineering(prev):
     #     day_agg.columns = pd.Index([f"last_{day}_" +  e[0] + "_" + e[1].upper() for e in day_agg.columns.tolist()])
     #     prev_agg = prev_agg.merge(right=day_agg.reset_index(), how="left", on="SK_ID_CURR")
 
-    for number in [1, 2, 3, 5]:
+    for number in [1, 5]:
         last_nth_agg = {
             'DAYS_FIRST_DRAWING': ['mean'],
             'AMT_CREDIT': ['mean'],
             'CNT_PAYMENT': ['mean'],
             'RATE_DOWN_PAYMENT': ['mean'],
             'DAYS_DECISION': ['mean'],
+            'IS_REFUSED': ['sum'],
         }
-        nth_agg = prev_sorted.groupby('SK_ID_CURR').head(number).groupby('SK_ID_CURR').agg(last_nth_agg)
+        nth_agg = prev_sorted.groupby('SK_ID_CURR').head(number).copy()
+        nth_agg['IS_REFUSED'] = (nth_agg['NAME_CONTRACT_STATUS'] == 'Refused').astype(int)
+        nth_agg = nth_agg.groupby('SK_ID_CURR').agg(last_nth_agg)
         nth_agg.columns = pd.Index([f"last_{number}th_" +  e[0] + "_" + e[1].upper() for e in nth_agg.columns.tolist()])
         prev_agg = prev_agg.merge(right=nth_agg.reset_index(), how="left", on="SK_ID_CURR")
 

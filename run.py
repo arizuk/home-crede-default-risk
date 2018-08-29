@@ -19,7 +19,7 @@ from src import utils
 from src import data
 from src.feats import selection
 
-CONFIG_ID=2
+CONFIG_ID=1
 
 def get_lgbm_params():
     config_id = CONFIG_ID
@@ -97,7 +97,6 @@ def lgbm_train(train, y, test, features):
         train[categorical_feats] = categ_train #restore
         trn_x, val_x, trn_y, val_y = train_test_split(train[features], y,  test_size=0.2, random_state=random_states[i])
         feats.encode_categories(train=trn_x, test=val_x, y=trn_y, features=categorical_feats)
-
         clf = LGBMClassifier(**params)
 
         eval_set = [(trn_x, trn_y), (val_x, val_y)]
