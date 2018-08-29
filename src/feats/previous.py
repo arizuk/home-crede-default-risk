@@ -29,6 +29,72 @@ def count_encoding(df, column='NAME_CONTRACT_STATUS'):
     cnt_prev.fillna(0)
     return cnt_prev
 
+def approved_agg(prev):
+    approved = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved'].copy()
+    # approved.drop(['NAME_CONTRACT_STATUS', 'CODE_REJECT_REASON'], inplace=True, axis=1)
+    # approved.drop(['HOUR_APPR_PROCESS_START', 'NAME_GOODS_CATEGORY', 'NAME_CASH_LOAN_PURPOSE'], inplace=True, axis=1)
+    # approved['X_HOUR_APPR_PROCESS_START'] = approved['HOUR_APPR_PROCESS_START'].astype(str) # To categorical feature
+    # approved = dummy_encoding(approved)
+
+    # for c in approved.columns:
+    #     ignore = ['SK_ID_PREV', 'SK_ID_CURR', 'DAYS_FIRST_DUE', 'DAYS_LAST_DUE_1ST_VERSION']
+    #     if c in ignore or c in agg:
+    #         continue
+    #     if approved[c].dtype != 'object':
+    #         agg[c] = ['mean']
+
+    diff = (approved['AMT_APPLICATION'] - approved['AMT_CREDIT']) / approved['AMT_CREDIT']
+    approved['X_AMT_APPLICATION_DIFF_RATIO'] = diff
+    aggs = {
+        'AMT_ANNUITY': ['max', 'mean', 'size'],
+        'AMT_APPLICATION': ['max', 'mean'],
+        'AMT_CREDIT': ['max', 'mean'],
+        'AMT_GOODS_PRICE': ['mean'],
+        'X_AMT_APPLICATION_DIFF_RATIO': ['mean'],
+    }
+    approved_agg = approved.groupby('SK_ID_CURR').agg(aggs)
+    approved_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in approved_agg.columns.tolist()])
+
+    cash_loans = approved[approved.NAME_CONTRACT_TYPE == 'Cash loans']
+    aggs = {
+        'AMT_ANNUITY': ['mean'],
+        'AMT_APPLICATION': ['mean'],
+        'AMT_CREDIT': ['mean'],
+        'CNT_PAYMENT': ['mean'],
+    }
+    cash_loans = cash_loans.groupby('SK_ID_CURR').agg(aggs)
+    cash_loans.columns = pd.Index(["cash_loans_" + e[0] + "_" + e[1].upper() for e in cash_loans.columns.tolist()])
+
+    consumer_loans = approved[approved.NAME_CONTRACT_TYPE == 'Consumer loans']
+    aggs = {
+        'AMT_ANNUITY': ['mean'],
+        'AMT_APPLICATION': ['mean'],
+        'AMT_CREDIT': ['mean'],
+        'CNT_PAYMENT': ['mean'],
+        'AMT_DOWN_PAYMENT': ['mean'],
+        'RATE_DOWN_PAYMENT': ['mean'],
+    }
+    consumer_loans = consumer_loans.groupby('SK_ID_CURR').agg(aggs)
+    consumer_loans.columns = pd.Index(["consumer_loans_" + e[0] + "_" + e[1].upper() for e in consumer_loans.columns.tolist()])
+
+    revolving_loans = approved[approved.NAME_CONTRACT_TYPE == 'Revolving loans']
+    aggs = {
+        'AMT_ANNUITY': ['mean'],
+        'AMT_APPLICATION': ['mean'],
+        'AMT_CREDIT': ['mean'],
+    }
+    revolving_loans = revolving_loans.groupby('SK_ID_CURR').agg(aggs)
+    revolving_loans.columns = pd.Index(["revolving_loans_" + e[0] + "_" + e[1].upper() for e in revolving_loans.columns.tolist()])
+
+    cnt_name_contract_type = count_encoding(approved, 'NAME_CONTRACT_TYPE')
+
+    approved_agg = approved_agg.reset_index()
+    approved_agg = approved_agg.merge(right=cnt_name_contract_type.reset_index(), how="left", on="SK_ID_CURR")
+    approved_agg = approved_agg.merge(right=cash_loans.reset_index(), how="left", on="SK_ID_CURR")
+    approved_agg = approved_agg.merge(right=consumer_loans.reset_index(), how="left", on="SK_ID_CURR")
+    approved_agg = approved_agg.merge(right=revolving_loans.reset_index(), how="left", on="SK_ID_CURR")
+    return approved_agg.set_index('SK_ID_CURR')
+
 def engineering(prev):
     prev = prev[prev['NFLAG_LAST_APPL_IN_DAY'] == 1]
     prev = prev[prev['FLAG_LAST_APPL_PER_CONTRACT'] == 'Y']
@@ -42,50 +108,31 @@ def engineering(prev):
     prev['DAYS_FIRST_DUE'].replace(365243, np.nan, inplace=True)
     prev['DAYS_LAST_DUE_1ST_VERSION'].replace(365243, np.nan, inplace=True)
 
-    prev['IS_TERMINATED'] = (prev['DAYS_TERMINATION'] < 0).astype(int)
-    prev['IS_EARLY_END'] = (prev['DAYS_LAST_DUE_1ST_VERSION'] > prev['DAYS_LAST_DUE'] ).astype(int)
-    # prev['IS_DEFERED_END'] = (prev['DAYS_LAST_DUE_1ST_VERSION'] < prev['DAYS_LAST_DUE']).astype(int)
-
     # Agg
     prev_agg = prev.groupby('SK_ID_CURR').size().to_frame()
     prev_agg.columns = ['X_PREV_COUNT']
     prev_agg.reset_index()
 
-    # Approved
-    approved = prev[prev['NAME_CONTRACT_STATUS'] == 'Approved'].copy()
-    approved.drop(['NAME_CONTRACT_STATUS', 'CODE_REJECT_REASON'], inplace=True, axis=1)
-    approved.drop(['HOUR_APPR_PROCESS_START', 'NAME_GOODS_CATEGORY', 'NAME_CASH_LOAN_PURPOSE'], inplace=True, axis=1)
-    # approved['X_HOUR_APPR_PROCESS_START'] = approved['HOUR_APPR_PROCESS_START'].astype(str) # To categorical feature
-    approved = dummy_encoding(approved)
-    agg = {
-        'AMT_ANNUITY': ['max', 'mean'],
-        'AMT_APPLICATION': ['max', 'mean'],
-        'AMT_CREDIT': ['max', 'mean'],
-        'DAYS_DECISION': ['max', 'min'],
-        # ?
-        'DAYS_FIRST_DRAWING': ['max', 'min'],
-        # 'DAYS_FIRST_DUE': None, #['max', 'min'], # 初回の支払い日
-        # 'DAYS_LAST_DUE_1ST_VERSION': ['max', 'min'], # 契約時の支払い完了予定日
-        'DAYS_LAST_DUE': ['max'], # 支払い完了予定日。未来の場合が365243が入る
-        'DAYS_TERMINATION': ['max'], # 支払い完了日。未来の場合が365243が入る
-        # 'IS_ACTIVE': ['sum'],
-        'IS_EARLY_END': ['mean', 'sum'],
-        # 'IS_DEFERED_END': ['mean', 'sum'],
+    aggs = {
+        'DAYS_DECISION': ['max', 'min', 'mean'],
+        'DAYS_FIRST_DRAWING': ['max', 'min', 'mean'],
+        'DAYS_FIRST_DUE': ['max', 'min', 'mean'],
+        'DAYS_LAST_DUE_1ST_VERSION': ['max', 'min', 'mean'],
+        'DAYS_LAST_DUE': ['max', 'min', 'mean'],
+        'DAYS_TERMINATION': ['max', 'min', 'mean'],
     }
-    for c in approved.columns:
-        ignore = ['SK_ID_PREV', 'SK_ID_CURR', 'DAYS_FIRST_DUE', 'DAYS_LAST_DUE_1ST_VERSION']
-        if c in ignore or c in agg:
-            continue
-        if approved[c].dtype != 'object':
-            agg[c] = ['mean']
+    all_agg = prev.groupby('SK_ID_CURR').agg(aggs)
+    all_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in all_agg.columns.tolist()])
+    prev_agg = prev_agg.merge(right=all_agg.reset_index(), how="left", on="SK_ID_CURR")
 
-    approved = approved.groupby('SK_ID_CURR').agg(agg)
-    approved.columns = pd.Index([e[0] + "_" + e[1].upper() for e in approved.columns.tolist()])
+    # Cnt
+    cnt_name_contract_status = count_encoding(prev, 'NAME_CONTRACT_STATUS')
+    prev_agg = prev_agg.merge(right=cnt_name_contract_status.reset_index(), how="left", on="SK_ID_CURR")
 
-    # 差額の平均
-    diff = (approved['AMT_APPLICATION_MEAN'] - approved['AMT_CREDIT_MEAN']) / approved['AMT_CREDIT_MEAN']
-    approved['X_AMT_APPLICATION_DIFF_RATIO'] = diff
-    del approved['AMT_APPLICATION_MEAN']
+    # Approved
+    approved = approved_agg(prev)
+    approved.columns = pd.Index(["approved_" + f for f in approved.columns.tolist()])
+    prev_agg = prev_agg.merge(right=approved.reset_index(), how="left", on="SK_ID_CURR")
 
     # Refused
     refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
@@ -94,24 +141,17 @@ def engineering(prev):
     refused['X_REFUSED_AMT_APPLICATION'] = refused['AMT_APPLICATION']
     del refused['AMT_APPLICATION']
     refused['CODE_REJECT_REASON'] = refused['CODE_REJECT_REASON'].astype('category')
+    prev_agg = prev_agg.merge(right=refused.reset_index(), how="left", on="SK_ID_CURR")
 
     # Last app features
     prev_sorted = prev.sort_values(['SK_ID_CURR', 'DAYS_DECISION'])
     last_app = prev_sorted.groupby(by=['SK_ID_CURR']).last().reset_index()
     last_app_merge = pd.DataFrame({})
     last_app_merge['SK_ID_CURR'] = last_app['SK_ID_CURR']
-    last_app_merge['X_PREV_WAS_APPROVED'] = (last_app['NAME_CONTRACT_STATUS'] == 'Approved').astype(int)
-    last_app_merge['X_PREV_WAS_REFUSED'] = (last_app['NAME_CONTRACT_STATUS'] == 'Refused').astype(int)
+    last_app_merge['X_LAST_WAS_APPROVED'] = (last_app['NAME_CONTRACT_STATUS'] == 'Approved').astype(int)
+    last_app_merge['X_LAST_WAS_REVOLVING_LOAN'] = (last_app['NAME_CONTRACT_TYPE'] == 'Revolving loans').astype(int)
     del last_app
-
-    # Cnt
-    cnt_name_contract_status = count_encoding(prev, 'NAME_CONTRACT_STATUS')
-
-    # join
-    prev_agg = prev_agg.merge(right=approved.reset_index(), how="left", on="SK_ID_CURR")
-    prev_agg = prev_agg.merge(right=refused.reset_index(), how="left", on="SK_ID_CURR")
     prev_agg = prev_agg.merge(right=last_app_merge, how="left", on="SK_ID_CURR")
-    prev_agg = prev_agg.merge(right=cnt_name_contract_status.reset_index(), how="left", on="SK_ID_CURR")
 
     # for day in [90, 180, 360]:
     #     last_nday_agg = {
@@ -124,20 +164,22 @@ def engineering(prev):
     #     day_agg.columns = pd.Index([f"last_{day}_" +  e[0] + "_" + e[1].upper() for e in day_agg.columns.tolist()])
     #     prev_agg = prev_agg.merge(right=day_agg.reset_index(), how="left", on="SK_ID_CURR")
 
-    for number in [1, 5]:
-        last_nth_agg = {
-            'DAYS_FIRST_DRAWING': ['mean'],
-            'AMT_CREDIT': ['mean'],
-            'CNT_PAYMENT': ['mean'],
-            'RATE_DOWN_PAYMENT': ['mean'],
-            'DAYS_DECISION': ['mean'],
-            'IS_REFUSED': ['sum'],
-        }
-        nth_agg = prev_sorted.groupby('SK_ID_CURR').head(number).copy()
-        nth_agg['IS_REFUSED'] = (nth_agg['NAME_CONTRACT_STATUS'] == 'Refused').astype(int)
-        nth_agg = nth_agg.groupby('SK_ID_CURR').agg(last_nth_agg)
-        nth_agg.columns = pd.Index([f"last_{number}th_" +  e[0] + "_" + e[1].upper() for e in nth_agg.columns.tolist()])
-        prev_agg = prev_agg.merge(right=nth_agg.reset_index(), how="left", on="SK_ID_CURR")
+    # for number in [1, 5]:
+    #     last_nth_agg = {
+    #         'DAYS_FIRST_DRAWING': ['mean'],
+    #         'AMT_CREDIT': ['mean'],
+    #         'CNT_PAYMENT': ['mean'],
+    #         'RATE_DOWN_PAYMENT': ['mean'],
+    #         'DAYS_DECISION': ['mean'],
+    #         'IS_REFUSED': ['sum'],
+    #         'IS_REVOLING': ['mean'],
+    #     }
+    #     nth_agg = prev_sorted.groupby('SK_ID_CURR').head(number).copy()
+    #     nth_agg['IS_REFUSED'] = (nth_agg['NAME_CONTRACT_STATUS'] == 'Refused').astype(int)
+    #     nth_agg['IS_REVOLING'] = (nth_agg['NAME_CONTRACT_STATUS'] == 'Revolving loans').astype(int)
+    #     nth_agg = nth_agg.groupby('SK_ID_CURR').agg(last_nth_agg)
+    #     nth_agg.columns = pd.Index([f"last_{number}th_" +  e[0] + "_" + e[1].upper() for e in nth_agg.columns.tolist()])
+    #     prev_agg = prev_agg.merge(right=nth_agg.reset_index(), how="left", on="SK_ID_CURR")
 
     prev_agg = prev_agg.set_index('SK_ID_CURR')
     return prev_agg

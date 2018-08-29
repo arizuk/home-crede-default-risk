@@ -141,5 +141,5 @@ def app_features(df):
       del df[c]
 
 def combined_features(df):
-    df['X_APPROVTED_AMT_CREDIT_RATIO'] = df['AMT_CREDIT'] / df['prev_AMT_CREDIT_MAX']
+    df['X_APPROVTED_AMT_CREDIT_RATIO'] = df['AMT_CREDIT'] / df['prev_approved_AMT_CREDIT_MAX']
     return True
