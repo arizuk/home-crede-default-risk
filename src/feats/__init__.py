@@ -121,8 +121,20 @@ def app_features(df):
     df['X_SHORT_EMPLOYMENT'] = (df['DAYS_EMPLOYED'] < -2000).astype(int)
     df['X_YOUNG_AGE'] = (df['DAYS_BIRTH'] < -14000).astype(int)
 
-    doc_flags = [_f for _f in df.columns if 'FLAG_DOC' in _f]
-    for f in doc_flags:
+    useless_flags = ['FLAG_DOCUMENT_10',
+                    'FLAG_DOCUMENT_12',
+                    'FLAG_DOCUMENT_13',
+                    'FLAG_DOCUMENT_14',
+                    'FLAG_DOCUMENT_15',
+                    'FLAG_DOCUMENT_16',
+                    'FLAG_DOCUMENT_17',
+                    'FLAG_DOCUMENT_19',
+                    'FLAG_DOCUMENT_2',
+                    'FLAG_DOCUMENT_20',
+                    'FLAG_DOCUMENT_21']
+
+    # doc_flags = [_f for _f in df.columns if 'FLAG_DOC' in _f]
+    for f in useless_flags:
         del df[f]
 
     # df['X_OCCUPATION_TYPE'] = df.OCCUPATION_TYPE.astype('category')
