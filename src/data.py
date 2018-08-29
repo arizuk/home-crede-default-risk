@@ -181,10 +181,8 @@ def load_pos():
 
     # MONTHS_BALANCE == 1 and CNT_INSTALMENT_FUTURE > 1 なら支払いが残っているとみなす
     prev_last['IS_ACTIVE'] = ((prev_last.MONTHS_BALANCE == -1) & (prev_last.CNT_INSTALMENT_FUTURE > 1)).astype(int)
-    prev_last['IS_DEMAND'] = (prev_last.NAME_CONTRACT_STATUS == 'Demand').astype(int)
     prev_last_agg = {
         'IS_ACTIVE': ['sum'],
-        'IS_DEMAND': ['sum', 'mean'],
     }
     curr_prev_last = prev_last.groupby('SK_ID_CURR').agg(prev_last_agg)
     curr_prev_last.columns = pd.Index(['LAST_' + e[0] + "_" + e[1].upper() for e in curr_prev_last.columns.tolist()])
@@ -202,31 +200,33 @@ def load_pos():
         df['POS_OVERDUE_DEF'] = (df.SK_DPD_DEF > 0).astype(int)
         pos_aggs = {
             # 支払いがあった期間
-            'MONTHS_BALANCE': ['max', 'min'],
-            'SK_DPD': ['max', 'mean'],
-            'SK_DPD_DEF': ['max', 'mean'],
-            'POS_OVERDUE': ['sum'],
-            'POS_OVERDUE_DEF': ['sum']
+            'MONTHS_BALANCE': ['max', 'min', 'mean'],
+            'SK_DPD': ['mean', 'std'],
+            'SK_DPD_DEF': ['mean', 'std'],
+            'POS_OVERDUE': ['sum', 'mean'],
+            'POS_OVERDUE_DEF': ['sum', 'mean'],
         }
         pos_agg = df.groupby('SK_ID_CURR').agg(pos_aggs)
         pos_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in pos_agg.columns.tolist()])
-        pos_agg['X_POS_COUNT'] = pos.groupby('SK_ID_CURR').size()
-        pos_agg['X_POS_OVERDUE_RATIO'] = pos['POS_OVERDUE'] / pos_agg['X_POS_COUNT']
-        pos_agg['X_POS_OVERDUE_DEF_RATIO'] = pos['POS_OVERDUE_DEF'] / pos_agg['X_POS_COUNT']
+        pos_agg['X_POS_COUNT'] = df.groupby('SK_ID_CURR').size()
+        # pos_agg['SK_DPD_kurtosis'] = df.groupby('SK_ID_CURR').SK_DPD.apply(pd.Series.kurt)
+        # pos_agg['SK_DPD_DEF_kurtosis'] = df.groupby('SK_ID_CURR').SK_DPD_DEF.apply(pd.Series.kurt)
+        # pos_agg['X_POS_OVERDUE_RATIO'] = pos['POS_OVERDUE'] / pos_agg['X_POS_COUNT']
+        # pos_agg['X_POS_OVERDUE_DEF_RATIO'] = pos['POS_OVERDUE_DEF'] / pos_agg['X_POS_COUNT']
         return pos_agg
 
     pos_agg = agg(pos)
 
-    head_pos = prev_pos_gr.head(3).copy()
-    head_pos_agg = agg(head_pos)
-    head_pos_agg.columns = ['head_{}'.format(c) for c in head_pos_agg.columns]
+    # head_pos = prev_pos_gr.head(3).copy()
+    # head_pos_agg = agg(head_pos)
+    # head_pos_agg.columns = ['head_{}'.format(c) for c in head_pos_agg.columns]
 
-    pos_agg = pos_agg.merge(right=head_pos_agg.reset_index(), how="left", on="SK_ID_CURR")
+    # pos_agg = pos_agg.merge(right=head_pos_agg.reset_index(), how="left", on="SK_ID_CURR")
     pos_agg = pos_agg.merge(right=curr_prev_last.reset_index(), how="left", on="SK_ID_CURR")
     pos_agg = pos_agg.merge(right=curr_active.reset_index(), how="left", on="SK_ID_CURR")
     pos_agg = pos_agg.set_index('SK_ID_CURR')
 
-    del pos, head_pos, head_pos_agg, curr_prev_last, curr_active
+    del pos, curr_prev_last, curr_active
     gc.collect()
     return pos_agg
 

@@ -51,6 +51,9 @@ def approved_agg(prev):
         'AMT_CREDIT': ['max', 'mean'],
         'AMT_GOODS_PRICE': ['mean'],
         'X_AMT_APPLICATION_DIFF_RATIO': ['mean'],
+        # 'RATE_INTEREST_PRIMARY': ['mean'],
+        # 'RATE_INTEREST_PRIVILEGED': ['mean'],
+        # 'DAYS_DECISION': ['mean'],
     }
     approved_agg = approved.groupby('SK_ID_CURR').agg(aggs)
     approved_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in approved_agg.columns.tolist()])
@@ -129,12 +132,7 @@ def engineering(prev):
     cnt_name_contract_status = count_encoding(prev, 'NAME_CONTRACT_STATUS')
     prev_agg = prev_agg.merge(right=cnt_name_contract_status.reset_index(), how="left", on="SK_ID_CURR")
 
-    # Approved
-    approved = approved_agg(prev)
-    approved.columns = pd.Index(["approved_" + f for f in approved.columns.tolist()])
-    prev_agg = prev_agg.merge(right=approved.reset_index(), how="left", on="SK_ID_CURR")
-
-    # Refused
+   # Refused
     refused = prev[prev['NAME_CONTRACT_STATUS'] == 'Refused']
     refused = refused.sort_values(['DAYS_DECISION'], ascending=False)
     refused = refused[['SK_ID_CURR', 'CODE_REJECT_REASON', 'AMT_APPLICATION']].groupby('SK_ID_CURR').nth(0)
@@ -150,8 +148,20 @@ def engineering(prev):
     last_app_merge['SK_ID_CURR'] = last_app['SK_ID_CURR']
     last_app_merge['X_LAST_WAS_APPROVED'] = (last_app['NAME_CONTRACT_STATUS'] == 'Approved').astype(int)
     last_app_merge['X_LAST_WAS_REVOLVING_LOAN'] = (last_app['NAME_CONTRACT_TYPE'] == 'Revolving loans').astype(int)
+    last_app_merge['X_LAST_NAME_CLIENT_TYPE'] = last_app.NAME_CLIENT_TYPE.astype('category')
     del last_app
     prev_agg = prev_agg.merge(right=last_app_merge, how="left", on="SK_ID_CURR")
+
+    # Approved
+    approved = approved_agg(prev)
+    approved.columns = pd.Index(["approved_" + f for f in approved.columns.tolist()])
+    prev_agg = prev_agg.merge(right=approved.reset_index(), how="left", on="SK_ID_CURR")
+
+    # ## last nth approved
+    # last_nth = prev_sorted[prev_sorted.NAME_CONTRACT_STATUS == "Approved"].groupby('SK_ID_CURR').head(10).copy()
+    # last_nth = approved_agg(last_nth)
+    # last_nth.columns = pd.Index(["approved_" + f for f in last_nth.columns.tolist()])
+    # prev_agg = prev_agg.merge(right=last_nth.reset_index(), how="left", on="SK_ID_CURR")
 
     # for day in [90, 180, 360]:
     #     last_nday_agg = {
