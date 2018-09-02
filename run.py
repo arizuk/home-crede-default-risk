@@ -28,6 +28,63 @@ def get_lgbm_params():
     print("[CONFIG] {}.json {}".format(config_id, data))
     return data
 
+def lgbm_train_kfold2(train, y, test, features, random_state=42):
+    categorical_feats = [ f for f in train.columns if train[f].dtype == 'object' ]
+    categ_train = train[categorical_feats]
+    feats.encode_categories(train=train, test=test, y=y, features=categorical_feats)
+
+    test_preds = np.zeros(test.shape[0])
+
+    for seed in [0, 20, 36, 42, 60]:
+        folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
+        trn_preds = np.zeros(train.shape[0])
+        oof_preds = np.zeros(train.shape[0])
+
+        params = get_lgbm_params()
+
+        for n_fold, (trn_idx, val_idx) in enumerate(folds.split(train, y)):
+            train[categorical_feats] = categ_train #restore
+            trn_x, trn_y = train[features].iloc[trn_idx], y.iloc[trn_idx]
+            val_x, val_y = train[features].iloc[val_idx], y.iloc[val_idx]
+            feats.encode_categories(train=trn_x, test=val_x, y=trn_y, features=categorical_feats)
+
+            clf = LGBMClassifier(**params)
+            with utils.timeit():
+                clf.fit(trn_x, trn_y,
+                        eval_set= [(trn_x, trn_y), (val_x, val_y)],
+                        eval_metric='auc', verbose=250, early_stopping_rounds=200
+                    )
+
+            trn_preds[trn_idx] = clf.predict_proba(trn_x, num_iteration=clf.best_iteration_)[:, 1]
+            oof_preds[val_idx] = clf.predict_proba(val_x, num_iteration=clf.best_iteration_)[:, 1]
+            test_preds += clf.predict_proba(test[features], num_iteration=clf.best_iteration_)[:, 1] / folds.n_splits
+
+            val_auc = roc_auc_score(val_y, oof_preds[val_idx])
+            print('Fold %2d AUC : %.6f' % (n_fold + 1, val_auc))
+            del clf, trn_x, trn_y, val_x, val_y
+            gc.collect()
+
+        clf=None
+        auc = roc_auc_score(y, oof_preds)
+        print('Full AUC score %.6f' % auc)
+        trn_auc = roc_auc_score(y, trn_preds)
+
+        config = {
+            'model': 'lgbm',
+            'params': params,
+            'trn_auc': trn_auc,
+            'auc': auc,
+        }
+
+    test_preds = test_preds / 5
+
+    return {
+        'clf': clf,
+        'config': config,
+        'test_preds': test_preds,
+    }
+
+
 def lgbm_train_kfold(train, y, test, features, random_state=42):
     categorical_feats = [ f for f in train.columns if train[f].dtype == 'object' ]
     categ_train = train[categorical_feats]
@@ -144,7 +201,7 @@ if __name__ == '__main__':
     print('Using features: {}'.format(len(features)), flush=True)
 
     if args.kfold:
-        results = lgbm_train_kfold(
+        results = lgbm_train_kfold2(
             train=train,
             y=y,
             test=test,
