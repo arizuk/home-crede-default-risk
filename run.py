@@ -155,7 +155,6 @@ def lgbm_train(train, y, test, features):
         trn_x, val_x, trn_y, val_y = train_test_split(train[features], y,  test_size=0.2, random_state=random_states[i])
         feats.encode_categories(train=trn_x, test=val_x, y=trn_y, features=categorical_feats)
         clf = LGBMClassifier(**params)
-
         eval_set = [(trn_x, trn_y), (val_x, val_y)]
         with utils.timeit():
             clf.fit(trn_x, trn_y, eval_set=eval_set, eval_metric='auc', verbose=250, early_stopping_rounds=200)
@@ -201,7 +200,7 @@ if __name__ == '__main__':
     print('Using features: {}'.format(len(features)), flush=True)
 
     if args.kfold:
-        results = lgbm_train_kfold2(
+        results = lgbm_train_kfold(
             train=train,
             y=y,
             test=test,

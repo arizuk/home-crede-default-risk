@@ -32,6 +32,8 @@ def weighted_average(df, weight_col, by_col):
 @pd_df_cache('prev')
 def load_prev():
     prev = utils.read_csv('./input/previous_application.csv')
+    score = pd.read_csv('./features/previous_score.csv')
+    prev = prev.merge(right=score, how="left", on="SK_ID_PREV")
     return feats.previous.engineering(prev)
 
 @pd_df_cache('inst')

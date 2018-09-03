@@ -51,9 +51,9 @@ def approved_agg(prev):
         'AMT_CREDIT': ['max', 'mean'],
         'AMT_GOODS_PRICE': ['mean'],
         'X_AMT_APPLICATION_DIFF_RATIO': ['mean'],
-        # 'RATE_INTEREST_PRIMARY': ['mean'],
-        # 'RATE_INTEREST_PRIVILEGED': ['mean'],
-        # 'DAYS_DECISION': ['mean'],
+        #'RATE_INTEREST_PRIMARY': ['mean'],
+        #'RATE_INTEREST_PRIVILEGED': ['mean'],
+        #'DAYS_DECISION': ['mean'],
     }
     approved_agg = approved.groupby('SK_ID_CURR').agg(aggs)
     approved_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in approved_agg.columns.tolist()])
@@ -123,6 +123,7 @@ def engineering(prev):
         'DAYS_LAST_DUE_1ST_VERSION': ['max', 'min', 'mean'],
         'DAYS_LAST_DUE': ['max', 'min', 'mean'],
         'DAYS_TERMINATION': ['max', 'min', 'mean'],
+        'SCORE': ['mean', 'min', 'max', 'std']
     }
     all_agg = prev.groupby('SK_ID_CURR').agg(aggs)
     all_agg.columns = pd.Index([e[0] + "_" + e[1].upper() for e in all_agg.columns.tolist()])
