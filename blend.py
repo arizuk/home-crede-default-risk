@@ -1,11 +1,11 @@
 import pandas as pd
 
 
-name = "corr-155-129"
+name = "corr-164-129"
 # df1 = pd.read_csv('./blends/WEIGHT_AVERAGE_RANK2.csv')
 df1 = pd.read_csv('./blends/corr_blend.csv')
-#df2 = pd.read_csv('./experiments/151-lgbm-kfold-0.793128.csv')
-df2 = pd.read_csv('experiments/155-lgbm-kfold-0.795283.csv')
+df2 = pd.read_csv('experiments/164-lgbm-kfold-0.794592.csv')
+#df2 = pd.read_csv('experiments/163-lgbm-avg-0.798722.csv')
 df3 = pd.read_csv('./experiments/129-lgbm-kfold-0.793110.csv')
 # df3 = pd.read_csv('./experiments/132-lgbm-avg-0.795612.csv')
 

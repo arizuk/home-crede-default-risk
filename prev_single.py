@@ -1,7 +1,7 @@
 from src import data
 from src import utils
 
-from sklearn.model_selection import GroupKFold, StratifiedKFold
+from sklearn.model_selection import GroupKFold, StratifiedKFold, KFold
 from sklearn.metrics import roc_auc_score
 import numpy as np
 import pandas as pd
@@ -44,11 +44,13 @@ if __name__ == '__main__':
     test.drop(['TARGET', 'SK_ID_CURR', 'SK_ID_PREV'], inplace=True, axis=1)
     print(train.columns.values)
 
-    folds = GroupKFold(n_splits=5)
     oof_preds = np.zeros(train.shape[0])
     test_preds = np.zeros(test.shape[0])
 
+    folds = GroupKFold(n_splits=5)
+    #folds = KFold(n_splits=5, shuffle=True, random_state=42)
     for n_fold, (trn_idx, val_idx) in enumerate(folds.split(train, y, groups=tr_sk_id_curr)):
+    #for n_fold, (trn_idx, val_idx) in enumerate(folds.split(train, y)):
         trn_x, trn_y = train.iloc[trn_idx], y.iloc[trn_idx]
         val_x, val_y = train.iloc[val_idx], y.iloc[val_idx]
 
