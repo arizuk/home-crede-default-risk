@@ -15,6 +15,42 @@ def label_encoding(df):
     df[obj_cols].replace(-1, np.nan, inplace=True)
     return df
 
+def target_encoding(trn_df, target, val_df, encode_train=True):
+    obj_cols = [c for c in trn_df.columns if trn_df[c].dtype=='O']
+    df = pd.DataFrame({ 'TARGET': target })
+    df[obj_cols] = trn_df[obj_cols]
+
+    prior = target.mean()
+    for c in obj_cols:
+        means = df.groupby(c).TARGET.mean()
+        if encode_train:
+            trn_df[c] = trn_df[c].map(means).fillna(prior)
+        val_df[c] = val_df[c].map(means).fillna(prior)
+
+def target_encoding2(trn_df, target, val_df, encode_train=True):
+    obj_cols = [c for c in trn_df.columns if trn_df[c].dtype=='O']
+
+    base_smoothing=10
+    min_samples_leaf=100
+
+    # Apply average function to all target data
+    prior = target.mean()
+
+    df = pd.DataFrame({ 'TARGET': target })
+    df[obj_cols] = trn_df[obj_cols]
+    for c in obj_cols:
+        averages = df.groupby(c).TARGET.agg(["mean", "count"])
+
+        # Compute smoothing
+        smoothing = 1 / (1 + np.exp(-(averages["count"] - min_samples_leaf) / base_smoothing))
+
+        # The bigger the count the less full_avg is taken into account
+        encoder = prior * (1 - smoothing) + averages["mean"] * smoothing
+
+        if encode_train:
+            trn_df[c] = trn_df[c].map(encoder).fillna(prior)
+        val_df[c] = val_df[c].map(encoder).fillna(prior)
+
 def cleansing(df):
     df['DAYS_LAST_DUE'].replace(365243, np.nan, inplace=True)
     df['DAYS_TERMINATION'].replace(365243, np.nan, inplace=True)
@@ -25,6 +61,7 @@ def cleansing(df):
 if __name__ == '__main__':
     target = utils.read_csv('./input/application_train.csv')
     target = target[['SK_ID_CURR', 'TARGET']]
+
     prev = utils.read_csv('./input/previous_application.csv')
     prev = prev.merge(how="left", right=target, on="SK_ID_CURR")
 
@@ -37,6 +74,8 @@ if __name__ == '__main__':
     train = prev[prev.TARGET.notnull()]
     train_idx = prev[prev.TARGET.notnull()].index.values
     y = train.TARGET
+
+    # target_encoding2(train, y, test, encode_train=False)
 
     sk_id_prev = prev.SK_ID_PREV
     tr_sk_id_curr = train.SK_ID_CURR
@@ -53,6 +92,10 @@ if __name__ == '__main__':
     #for n_fold, (trn_idx, val_idx) in enumerate(folds.split(train, y)):
         trn_x, trn_y = train.iloc[trn_idx], y.iloc[trn_idx]
         val_x, val_y = train.iloc[val_idx], y.iloc[val_idx]
+
+        # trn_x = trn_x.copy()
+        # val_x = val_x.copy()
+        # target_encoding2(trn_x, trn_y, val_x)
 
         params = {
             "n_estimators": 50000,

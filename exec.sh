@@ -1,6 +1,6 @@
 set -e
 
-python prev_single.py
+#python prev_single.py
 python run.py
 python run.py --kfold
 csv=$(ls experiments/*csv|sort|tail -1)

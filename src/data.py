@@ -113,6 +113,13 @@ def load_buro():
     buro.loc[buro['DAYS_CREDIT_UPDATE'] < -40000, 'DAYS_CREDIT_UPDATE'] = np.nan
     buro.loc[buro['DAYS_ENDDATE_FACT'] < -40000, 'DAYS_ENDDATE_FACT'] = np.nan
 
+    score = pd.read_csv('./features/bureau_score.csv')
+    score = score.merge(right=buro[['SK_ID_BUREAU', 'SK_ID_CURR']], how="left", on="SK_ID_BUREAU")
+    score_agg = score.groupby('SK_ID_CURR').SCORE.agg(['mean', 'max', 'min', 'std'])
+    score_agg.columns = pd.Index(["SCORE_" + e.upper() for e in score_agg.columns.tolist()])
+    del score
+
+    # cnt
     cnt_buro = (
         buro[['SK_ID_CURR', 'SK_ID_BUREAU', 'CREDIT_ACTIVE']]
         .groupby(['SK_ID_CURR', 'CREDIT_ACTIVE'])
@@ -126,6 +133,7 @@ def load_buro():
 
     del buro['CREDIT_CURRENCY']
 
+    # dummy encoding
     buro_dum = pd.DataFrame()
     buro_cat_features = [
         f_ for f_ in buro.columns if buro[f_].dtype == 'object'
@@ -166,6 +174,7 @@ def load_buro():
     avg_buro = avg_buro.merge(right=sum_buro.reset_index(), how="left", on="SK_ID_CURR")
     avg_buro = avg_buro.merge(right=closed_buro.reset_index(), how="left", on="SK_ID_CURR")
     avg_buro = avg_buro.merge(right=avg_buro_bal.reset_index(), how="left", on="SK_ID_CURR")
+    avg_buro = avg_buro.merge(right=score_agg.reset_index(), how="left", on="SK_ID_CURR")
     avg_buro = avg_buro.set_index('SK_ID_CURR')
 
     del cnt_buro, sum_buro, buro, closed_buro
